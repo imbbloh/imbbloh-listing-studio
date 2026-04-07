@@ -609,21 +609,10 @@
       </div>
     </div>
     <div class="notion-badge">
-      <div class="notion-dot connected" id="notionDot"></div>
-      Notion
+      <div class="notion-dot connected"></div>
+      Sheets
     </div>
   </header>
-
-  <!-- Token setup banner -->
-  <div id="tokenBanner" class="card" style="display:none; border-color: var(--accent); margin-bottom:16px;">
-    <div class="card-title">Notion Setup</div>
-    <p style="font-size:0.8rem; color:var(--muted); margin-bottom:12px;">Enter your Notion integration token to enable saving to Notion.</p>
-    <div class="form-group" style="margin-bottom:10px;">
-      <label>Notion Token</label>
-      <input type="text" id="tokenInput" placeholder="ntn_..." autocomplete="off" autocorrect="off" autocapitalize="off">
-    </div>
-    <button class="btn-generate" style="margin-top:0" onclick="saveToken()">Save Token</button>
-  </div>
 
   <!-- Form Card -->
   <div class="card">
@@ -691,7 +680,7 @@
     </div>
     <div class="output-actions">
       <button class="btn-action btn-copy" id="copyBtn" onclick="copyListing()">⎘ Copy</button>
-      <button class="btn-action btn-notion" id="notionBtn" onclick="saveToNotion()">↑ Save to Notion</button>
+      <button class="btn-action btn-notion" id="notionBtn" onclick="saveToSheets()">↑ Save to Sheets</button>
     </div>
   </div>
 
@@ -712,8 +701,14 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const NOTION_DB_ID = '33a28ea6a630800fb043fa9933880368';
-  let NOTION_TOKEN = localStorage.getItem('imbbloh_notion_token') || '';
+  const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSe-0uL1GuyqAR0O5HbXIDoYFlVhGAkQa0zqTHcaYK4d_n7QwQ/formResponse';
+  const FORM_FIELDS = {
+    gameTitle: 'entry.2072004085',
+    normalPrice: 'entry.710378137',
+    premiumPrice: 'entry.1907115641',
+    platform: 'entry.1583771425',
+    gameUrl: 'entry.1870493243'
+  };
 
   let selectedPlatform = null;
   let currentCopy = '';
@@ -856,7 +851,7 @@ ${tags}`;
     document.getElementById('outputCard').classList.add('visible');
     document.getElementById('syncRow').style.display = 'none';
     document.getElementById('notionBtn').disabled = false;
-    document.getElementById('notionBtn').textContent = '↑ Save to Notion';
+    document.getElementById('notionBtn').textContent = '↑ Save to Sheets';
 
     // Scroll to output
     setTimeout(() => {
@@ -878,17 +873,17 @@ ${tags}`;
     });
   }
 
-  async function saveToNotion() {
+  async function saveToSheets() {
     const name = document.getElementById('gameName').value.trim();
     const normalPrice = parseFloat(document.getElementById('normalPrice').value);
     const premiumPrice = parseFloat(document.getElementById('premiumPrice').value);
     const storeUrl = document.getElementById('storeUrl').value.trim();
 
     const platformLabels = {
-      ns12: 'NS1 & NS2',
-      ns2: 'NS2 Only',
+      ns12: 'Switch 1&2',
+      ns2: 'Switch 2',
       ps45: 'PS4 & PS5',
-      ps5: 'PS5 Only'
+      ps5: 'PS5'
     };
 
     const btn = document.getElementById('notionBtn');
@@ -896,54 +891,20 @@ ${tags}`;
     btn.textContent = 'Saving...';
 
     try {
-      const notionPayload = {
-        parent: { database_id: NOTION_DB_ID },
-        properties: {
-          'Game Title': { title: [{ text: { content: name } }] },
-          'Platform': { select: { name: platformLabels[selectedPlatform] } },
-          'Normal Price': { number: normalPrice },
-          'Premium Price': { number: premiumPrice },
-          'Official URL': { url: storeUrl || null }
-        }
-      };
+      const formData = new FormData();
+      formData.append(FORM_FIELDS.gameTitle, name);
+      formData.append(FORM_FIELDS.normalPrice, normalPrice);
+      formData.append(FORM_FIELDS.premiumPrice, premiumPrice);
+      formData.append(FORM_FIELDS.platform, platformLabels[selectedPlatform]);
+      formData.append(FORM_FIELDS.gameUrl, storeUrl);
 
-      // Try multiple proxies in sequence
-      const proxies = [
-        'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.notion.com/v1/pages'),
-        'https://corsproxy.io/?url=' + encodeURIComponent('https://api.notion.com/v1/pages'),
-        'https://proxy.cors.sh/https://api.notion.com/v1/pages',
-      ];
+      await fetch(FORM_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: formData
+      });
 
-      let response = null;
-      let lastErr = '';
-
-      for (const proxyUrl of proxies) {
-        try {
-          response = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Bearer ' + NOTION_TOKEN,
-              'Content-Type': 'application/json',
-              'Notion-Version': '2022-06-28',
-              'x-requested-with': 'XMLHttpRequest'
-            },
-            body: JSON.stringify(notionPayload)
-          });
-          if (response.ok) break;
-          const errBody = await response.text();
-          lastErr = 'HTTP ' + response.status + ': ' + errBody;
-          response = null;
-        } catch (e) {
-          lastErr = e.message;
-          response = null;
-        }
-      }
-
-      if (!response || !response.ok) {
-        throw new Error(lastErr || 'All proxies failed');
-      }
-
-      // Save locally too
+      // Save locally
       const listing = {
         id: Date.now(),
         name,
@@ -959,19 +920,21 @@ ${tags}`;
       localStorage.setItem('imbbloh_listings', JSON.stringify(listings));
       renderListings();
 
-      // Show sync indicator
       document.getElementById('syncRow').style.display = 'flex';
-      document.getElementById('syncMsg').textContent = `Saved to Notion · ${listing.date}`;
+      document.getElementById('syncMsg').textContent = 'Saved to Google Sheets · ' + listing.date;
       btn.textContent = '✓ Saved!';
-      showToast('Saved to Notion!');
+      showToast('Saved to Google Sheets!');
 
-      // Reset form after short delay
       setTimeout(() => {
         document.getElementById('gameName').value = '';
         document.getElementById('normalPrice').value = '';
         document.getElementById('premiumPrice').value = '';
         document.getElementById('storeUrl').value = '';
-        document.querySelectorAll('.platform-pill').forEach(el => el.classList.remove('selected-ns', 'selected-ps'));
+        document.querySelectorAll('.platform-pill').forEach(el => {
+          el.style.background = '';
+          el.style.borderColor = '';
+          el.style.color = '';
+        });
         selectedPlatform = null;
         currentCopy = '';
         document.getElementById('outputCard').classList.remove('visible');
@@ -981,10 +944,11 @@ ${tags}`;
     } catch (err) {
       console.error(err);
       btn.disabled = false;
-      btn.textContent = '↑ Save to Notion';
-      showToast('Error: ' + err.message.slice(0, 60), true); console.error('Notion error:', err.message);
+      btn.textContent = '↑ Save to Sheets';
+      showToast('Error saving — try again', true);
     }
   }
+
 
   function filterBy(type, btn) {
     currentFilter = type;
@@ -998,7 +962,7 @@ ${tags}`;
     let filtered = listings;
 
     if (currentFilter === 'ns') {
-      filtered = listings.filter(l => l.platform.startsWith('NS'));
+      filtered = listings.filter(l => l.platform.startsWith('Switch'));
     } else if (currentFilter === 'ps') {
       filtered = listings.filter(l => l.platform.startsWith('PS'));
     }
@@ -1132,28 +1096,7 @@ ${tags}`;
     document.getElementById('storeUrl').style.color = 'var(--text)';
   });
 
-  function saveToken() {
-    const t = document.getElementById('tokenInput').value.trim();
-    if (!t.startsWith('ntn_')) { showToast('Invalid token', true); return; }
-    NOTION_TOKEN = t;
-    localStorage.setItem('imbbloh_notion_token', t);
-    document.getElementById('tokenBanner').style.display = 'none';
-    document.getElementById('notionDot').classList.add('connected');
-    showToast('Notion connected!');
-  }
-
-  function checkToken() {
-    if (!NOTION_TOKEN) {
-      document.getElementById('tokenBanner').style.display = 'block';
-      document.getElementById('notionDot').classList.remove('connected');
-    } else {
-      document.getElementById('tokenBanner').style.display = 'none';
-      document.getElementById('notionDot').classList.add('connected');
-    }
-  }
-
   renderListings();
-  checkToken();
 </script>
 </body>
 </html>

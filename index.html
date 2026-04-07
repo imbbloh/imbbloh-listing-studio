@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>imbbloh · Listing Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0d10;
+  --surface: #16161c;
+  --surface2: #1e1e26;
+  --border: #2a2a36;
+  --accent: #f0c140;
+  --text: #eeeef2;
+  --muted: #7a7a90;
+  --green: #3ecf7e;
+  --blue: #0070d1;
+  --red: #e00000;
+  --radius: 14px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  padding-bottom: 60px;
+}
+
+.app {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.logo { display: flex; align-items: center; gap: 10px; }
+
+.logo-icon {
+  width: 38px; height: 38px;
+  background: var(--accent); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+
+.logo-text h1 {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 1.1rem; letter-spacing: -0.02em; line-height: 1;
+}
+
+.logo-text p {
+  font-size: 0.68rem; color: var(--muted);
+  margin-top: 2px; font-family: 'DM Mono', monospace;
+}
+
+.sheets-badge {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; font-size: 0.68rem;
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+
+.dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 6px var(--green);
+}
+
+/* ── Mode Toggle ── */
+.mode-toggle {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 4px; margin-bottom: 16px; gap: 4px;
+}
+
+.mode-btn {
+  padding: 11px 8px; border-radius: 9px;
+  border: none; background: transparent; color: var(--muted);
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer; text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mode-btn.game-active { background: var(--accent); color: #0d0d10; }
+.mode-btn.code-active { background: var(--green); color: #0d0d10; }
+
+/* ── Card ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+}
+
+.card-title {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 18px;
+  display: flex; align-items: center; gap: 7px;
+}
+
+.card-title::before {
+  content: ''; width: 5px; height: 5px;
+  background: var(--accent); border-radius: 50%; flex-shrink: 0;
+}
+
+.card-title.code-mode::before { background: var(--green); }
+
+/* ── Form ── */
+.form-group { margin-bottom: 14px; }
+
+label {
+  display: block; font-size: 0.72rem;
+  font-weight: 500; color: var(--muted); margin-bottom: 6px;
+}
+
+input {
+  width: 100%; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 9px;
+  color: var(--text); font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem; padding: 11px 14px;
+  outline: none; -webkit-appearance: none;
+}
+
+input:focus { border-color: var(--accent); }
+input::placeholder { color: var(--muted); opacity: 0.5; }
+
+.price-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.price-wrap { position: relative; }
+.price-wrap .pfx {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-family: 'DM Mono', monospace;
+  font-size: 0.82rem; pointer-events: none;
+}
+.price-wrap input { padding-left: 26px; }
+
+/* ── Platform Pills ── */
+.platform-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.plat-pill {
+  padding: 11px 8px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--surface2);
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer; text-align: center; line-height: 1.5;
+  user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pill-icon { font-size: 1rem; display: block; margin-bottom: 2px; }
+
+.ns-pill { color: #cc0000; border-color: rgba(224,0,0,0.25); }
+.ns-pill.sel { background: rgba(224,0,0,0.12); border-color: #e00000; color: #ff3333; }
+
+.ps-pill { color: var(--blue); border-color: rgba(0,112,209,0.25); }
+.ps-pill.sel { background: rgba(0,112,209,0.12); border-color: var(--blue); color: #3399ff; }
+.ps-pill.dimmed { opacity: 0.25; pointer-events: none; cursor: not-allowed; }
+
+.ns-only-note {
+  font-size: 0.7rem; color: var(--green);
+  font-family: 'DM Mono', monospace; margin-bottom: 8px; display: none;
+}
+
+/* ── Subtype Pills (Code) ── */
+.subtype-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+
+.sub-pill {
+  padding: 9px 4px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--surface2);
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer; text-align: center; color: var(--muted);
+  user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sub-pill.sub-active { background: var(--green); color: #0d0d10; border-color: var(--green); }
+
+/* ── Generate Button ── */
+.btn-gen {
+  width: 100%; padding: 14px; border-radius: 10px;
+  background: var(--accent); color: #0d0d10;
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase;
+  border: none; cursor: pointer; margin-top: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-gen.code-mode { background: var(--green); }
+
+/* ── Output ── */
+.output-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  margin-bottom: 16px; display: none;
+}
+
+.output-card.visible { display: block; }
+
+.output-topbar {
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+
+.output-text {
+  padding: 16px 18px; font-family: 'DM Mono', monospace;
+  font-size: 0.75rem; line-height: 1.75;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 320px; overflow-y: auto;
+}
+
+.sync-row {
+  display: none; align-items: center; gap: 8px;
+  padding: 8px 18px; font-size: 0.68rem; color: var(--green);
+  font-family: 'DM Mono', monospace; border-top: 1px solid var(--border);
+}
+
+.sync-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+.output-actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  padding: 14px 18px; border-top: 1px solid var(--border);
+}
+
+.btn-copy {
+  padding: 11px; border-radius: 9px;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+
+.btn-save {
+  padding: 11px; border-radius: 9px;
+  background: var(--green); border: none; color: #0d0d10;
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+
+.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-store {
+  display: block;
+  width: 100%; padding: 11px; border-radius: 9px;
+  background: var(--surface2); border: 1px solid var(--accent); color: var(--accent);
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase;
+  cursor: pointer; text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-store:active { background: rgba(240,193,64,0.1); }
+
+.btn-canva {
+  display: block;
+  width: 100%; padding: 11px; border-radius: 9px;
+  background: var(--surface2); border: 1px solid #7c4dff; color: #a67cff;
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase;
+  cursor: pointer; text-align: center; margin-top: 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-canva:active { background: rgba(124,77,255,0.1); }
+
+/* ── Listings ── */
+.listings-header {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 14px;
+}
+
+.section-title {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); display: flex; align-items: center; gap: 7px;
+}
+
+.section-title::before {
+  content: ''; width: 5px; height: 5px;
+  background: var(--green); border-radius: 50%; flex-shrink: 0;
+}
+
+.filter-pills { display: flex; gap: 6px; }
+
+.filter-pill {
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 0.65rem; font-weight: 700; font-family: 'Syne', sans-serif;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  cursor: pointer; border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.filter-pill.on { background: var(--accent); color: #0d0d10; border-color: var(--accent); }
+
+/* ── Listing Item ── */
+.listing-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 10px;
+}
+
+.listing-top {
+  display: flex; justify-content: space-between;
+  align-items: flex-start; gap: 8px; margin-bottom: 10px;
+}
+
+.listing-name {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.9rem; line-height: 1.3; flex: 1;
+}
+
+.listing-prices { text-align: right; flex-shrink: 0; }
+
+.price-line {
+  font-family: 'DM Mono', monospace; font-size: 0.78rem;
+  display: flex; align-items: center; gap: 4px; justify-content: flex-end;
+}
+
+.price-line + .price-line { margin-top: 2px; }
+.p-normal { color: var(--accent); }
+.p-premium { color: var(--green); }
+.p-single { color: var(--green); }
+
+.listing-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.badge {
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 0.62rem; font-weight: 700; font-family: 'Syne', sans-serif;
+  letter-spacing: 0.07em; text-transform: uppercase;
+}
+
+.b-ns { background: rgba(224,0,0,0.1); color: #ff3333; border: 1px solid rgba(224,0,0,0.2); }
+.b-ps { background: rgba(0,112,209,0.1); color: #3399ff; border: 1px solid rgba(0,112,209,0.2); }
+.b-code { background: rgba(62,207,126,0.1); color: var(--green); border: 1px solid rgba(62,207,126,0.2); }
+
+.listing-date {
+  font-size: 0.65rem; color: var(--muted);
+  font-family: 'DM Mono', monospace; margin-left: auto;
+}
+
+.listing-actions {
+  display: flex; gap: 6px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+}
+
+.item-btn {
+  flex: 1; padding: 7px; border-radius: 7px;
+  font-size: 0.65rem; font-weight: 700; font-family: 'Syne', sans-serif;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+.empty-state .icon { font-size: 2.2rem; margin-bottom: 10px; }
+.empty-state p { font-size: 0.82rem; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface2); border: 1px solid var(--green); color: var(--green);
+  padding: 10px 20px; border-radius: 30px;
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+  z-index: 999; opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); white-space: nowrap;
+}
+
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast.err { border-color: #ff4444; color: #ff4444; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎮</div>
+      <div class="logo-text">
+        <h1>imbbloh</h1>
+        <p>listing studio</p>
+      </div>
+    </div>
+    <div class="sheets-badge"><div class="dot"></div>Sheets</div>
+  </header>
+
+  <!-- Mode Toggle -->
+  <div class="mode-toggle">
+    <button class="mode-btn game-active" id="btnGame">🎮 Digital Game</button>
+    <button class="mode-btn" id="btnCode">🔑 Digital Code</button>
+  </div>
+
+  <!-- Form -->
+  <div class="card">
+    <div class="card-title" id="formTitle">New Listing</div>
+
+    <!-- Game Title -->
+    <div class="form-group">
+      <label>Game Title</label>
+      <input type="text" id="gameName" placeholder="e.g. Mario Kart World" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+
+    <!-- Platform -->
+    <div class="form-group">
+      <label>Platform</label>
+      <div class="ns-only-note" id="nsOnlyNote">● Nintendo only for Digital Codes</div>
+      <div class="platform-grid">
+        <div class="plat-pill ns-pill" id="p-ns12"><span class="pill-icon">🔴</span>NS1 &amp; NS2</div>
+        <div class="plat-pill ns-pill" id="p-ns2"><span class="pill-icon">🔴</span>NS2 Only</div>
+        <div class="plat-pill ps-pill" id="p-ps45"><span class="pill-icon">🔵</span>PS4 &amp; PS5</div>
+        <div class="plat-pill ps-pill" id="p-ps5"><span class="pill-icon">🔵</span>PS5 Only</div>
+      </div>
+    </div>
+
+    <!-- Code Subtype (code mode only) -->
+    <div class="form-group" id="secSubtype" style="display:none">
+      <label>Code Type</label>
+      <div class="subtype-grid">
+        <div class="sub-pill sub-active" id="sub-full">🎮 Full Game</div>
+        <div class="sub-pill" id="sub-dlc">🔹 DLC</div>
+        <div class="sub-pill" id="sub-upgrade">⬆️ Upgrade Pack</div>
+      </div>
+    </div>
+
+    <!-- Game: Dual price -->
+    <div id="secGamePrice">
+      <div class="price-row">
+        <div class="form-group">
+          <label>🟡 Normal Price</label>
+          <div class="price-wrap">
+            <span class="pfx">$</span>
+            <input type="number" id="normalPrice" placeholder="0" min="0" step="0.5">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>🟢 Premium Price</label>
+          <div class="price-wrap">
+            <span class="pfx">$</span>
+            <input type="number" id="premiumPrice" placeholder="0" min="0" step="0.5">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Code: Single price -->
+    <div id="secCodePrice" style="display:none">
+      <div class="form-group">
+        <label>💰 Price</label>
+        <div class="price-wrap">
+          <span class="pfx">$</span>
+          <input type="number" id="codePrice" placeholder="0" min="0" step="0.5">
+        </div>
+      </div>
+    </div>
+
+    <!-- Store URL (game mode only) -->
+    <div class="form-group" id="secStoreUrl">
+      <label>Official Store URL <span style="color:var(--green);font-size:0.65rem;font-weight:600">● Auto-generated</span></label>
+      <input type="text" id="storeUrl" placeholder="Auto-generated from title">
+    </div>
+
+    <button class="btn-gen" id="genBtn">✦ Generate Listing</button>
+  </div>
+
+  <!-- Output -->
+  <div class="output-card" id="outputCard">
+    <div class="output-topbar">Generated Copy</div>
+    <div class="output-text" id="outputText"></div>
+    <div class="sync-row" id="syncRow">
+      <div class="sync-dot"></div>
+      <span id="syncMsg"></span>
+    </div>
+    <div style="padding: 0 14px 10px; display:none" id="storeBtnWrap">
+      <button class="btn-store" id="storeBtn">🖼 View Store Page for Screenshots</button>
+      <button class="btn-canva" id="canvaBtn">🎨 Open in Canva</button>
+    </div>
+    <div class="output-actions">
+      <button class="btn-copy" id="copyBtn">⎘ Copy</button>
+      <button class="btn-save" id="saveBtn">↑ Save to Sheets</button>
+    </div>
+  </div>
+
+  <!-- Listings -->
+  <div class="listings-header">
+    <div class="section-title">Saved Listings</div>
+    <div class="filter-pills">
+      <button class="filter-pill on" id="filt-all">All</button>
+      <button class="filter-pill" id="filt-ns">NS</button>
+      <button class="filter-pill" id="filt-ps">PS</button>
+    </div>
+  </div>
+  <div id="listBox"></div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+var GAME_FORM = 'https://docs.google.com/forms/d/e/1FAIpQLSe-0uL1GuyqAR0O5HbXIDoYFlVhGAkQa0zqTHcaYK4d_n7QwQ/formResponse';
+var GF = {
+  title:    'entry.2072004085',
+  normal:   'entry.710378137',
+  premium:  'entry.1907115641',
+  platform: 'entry.1583771425',
+  url:      'entry.1870493243'
+};
+
+var CODE_FORM = 'https://docs.google.com/forms/d/e/1FAIpQLSfTj5GdwtAvIQtEPYofMpKnZm3EtBJ3k0a5IT54gQN0tOS44Q/formResponse';
+var CF = {
+  title:    'entry.1467854623',
+  price:    'entry.2053385314',
+  platform: 'entry.1745955846'
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+var appMode   = 'game';   // 'game' | 'code'
+var platSel   = null;     // 'ns12' | 'ns2' | 'ps45' | 'ps5'
+var codeSub   = 'full';   // 'full' | 'dlc' | 'upgrade'
+var curCopy   = '';
+var curFilt   = 'all';
+var saved     = JSON.parse(localStorage.getItem('ibl') || '[]');
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+function el(id) { return document.getElementById(id); }
+
+// ── Mode switch ────────────────────────────────────────────────────────────
+function setMode(m) {
+  appMode = m;
+  var isCode = m === 'code';
+
+  el('btnGame').className = 'mode-btn' + (isCode ? '' : ' game-active');
+  el('btnCode').className = 'mode-btn' + (isCode ? ' code-active' : '');
+  el('formTitle').textContent = isCode ? 'New Digital Code' : 'New Listing';
+  el('formTitle').className   = 'card-title' + (isCode ? ' code-mode' : '');
+  el('genBtn').className      = 'btn-gen'     + (isCode ? ' code-mode' : '');
+
+  el('secSubtype').style.display   = isCode ? 'block' : 'none';
+  el('secGamePrice').style.display = isCode ? 'none'  : 'block';
+  el('secCodePrice').style.display = isCode ? 'block' : 'none';
+  el('secStoreUrl').style.display  = isCode ? 'none'  : 'block';
+  el('nsOnlyNote').style.display   = isCode ? 'block' : 'none';
+
+  // Dim PS pills in code mode
+  el('p-ps45').classList.toggle('dimmed', isCode);
+  el('p-ps5').classList.toggle('dimmed', isCode);
+
+  // If PS was selected, deselect when switching to code
+  if (isCode && platSel && (platSel === 'ps45' || platSel === 'ps5')) {
+    el('p-' + platSel).classList.remove('sel');
+    platSel = null;
+  }
+
+  // Reset subtype to full when switching to game
+  if (!isCode) {
+    setSub('full');
+    el('p-ns12').classList.remove('dimmed');
+  }
+
+  // Reset output
+  curCopy = '';
+  el('outputCard').classList.remove('visible');
+  el('storeUrl').value = '';
+  el('storeUrl').style.color = '';
+}
+
+// ── Code subtype ───────────────────────────────────────────────────────────
+function setSub(s) {
+  codeSub = s;
+
+  ['full', 'dlc', 'upgrade'].forEach(function(id) {
+    el('sub-' + id).classList.remove('sub-active');
+  });
+  el('sub-' + s).classList.add('sub-active');
+
+  // Upgrade Pack = NS2 only
+  var ns12 = el('p-ns12');
+  if (s === 'upgrade') {
+    ns12.classList.add('dimmed');
+    ns12.style.opacity = '0.25';
+    ns12.style.pointerEvents = 'none';
+    // Auto-select NS2
+    if (platSel !== 'ns2') {
+      if (platSel) el('p-' + platSel).classList.remove('sel');
+      platSel = 'ns2';
+      el('p-ns2').classList.add('sel');
+    }
+  } else {
+    ns12.classList.remove('dimmed');
+    ns12.style.opacity = '';
+    ns12.style.pointerEvents = '';
+  }
+}
+
+// ── Platform select ────────────────────────────────────────────────────────
+function setPlat(p) {
+  // Block PS in code mode
+  if (appMode === 'code' && (p === 'ps45' || p === 'ps5')) return;
+  // Block NS1&2 when upgrade pack selected
+  if (codeSub === 'upgrade' && p === 'ns12') return;
+  // Block if already selected
+  if (platSel === p) return;
+
+  if (platSel) el('p-' + platSel).classList.remove('sel');
+  platSel = p;
+  el('p-' + p).classList.add('sel');
+
+  // Auto-generate URL in game mode
+  if (appMode === 'game') autoUrl();
+}
+
+// ── URL auto-generator ─────────────────────────────────────────────────────
+function autoUrl() {
+  var name = el('gameName').value.trim();
+  if (!name || !platSel) return;
+
+  var isPS = platSel === 'ps45' || platSel === 'ps5';
+  var s = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  s = s.replace(/[\u2122\u00AE\u00A9]/g, '');
+
+  if (isPS) {
+    s = s.replace(/\s*[\u2013\u2014]\s*/g, '--');
+    s = s.replace(/\s*:\s*/g, '--');
+  } else {
+    s = s.replace(/\s*[\u2013\u2014]\s*/g, '-');
+    s = s.replace(/:/g, '');
+  }
+
+  s = s.replace(/!/g, '').replace(/&/g, 'and').replace(/\+/g, 'plus');
+  s = s.toLowerCase().trim().replace(/\s+/g, '-');
+  s = s.replace(/[^a-z0-9-]/g, '');
+  s = isPS ? s.replace(/-{3,}/g, '--') : s.replace(/-+/g, '-');
+  s = s.replace(/^-+|-+$/g, '');
+
+  var url = '';
+  if      (platSel === 'ns12') url = 'www.nintendo.com/us/store/products/' + s + '-switch/';
+  else if (platSel === 'ns2')  url = 'www.nintendo.com/us/store/products/' + s + '-switch-2/';
+  else                          url = 'www.playstation.com/en-sg/games/' + s + '/';
+
+  el('storeUrl').value = url;
+  el('storeUrl').style.color = 'var(--green)';
+}
+
+// ── Generate ───────────────────────────────────────────────────────────────
+function doGenerate() {
+  var name = el('gameName').value.trim();
+  if (!name)    { showToast('Enter a game title', true); return; }
+  if (!platSel) { showToast('Select a platform', true); return; }
+
+  if (appMode === 'code') {
+    genCode(name);
+  } else {
+    genGame(name);
+  }
+}
+
+// ── Game template ──────────────────────────────────────────────────────────
+function genGame(name) {
+  var np = el('normalPrice').value;
+  var pp = el('premiumPrice').value;
+  var su = el('storeUrl').value.trim();
+
+  if (!np || !pp) { showToast('Enter both prices', true); return; }
+
+  var isPS = platSel === 'ps45' || platSel === 'ps5';
+  var yt   = 'www.youtube.com/results?search_query=' + name.trim().replace(/\s+/g, '+') + (isPS ? '+playstation+trailer' : '+switch+trailer');
+
+  var bl, ss, nd, ol, ts, tag;
+
+  if (platSel === 'ns12') {
+    bl  = '\u{1D401}\u{1D428}\u{1D42B} \u{1D40D}\u{1D422}\u{1D427}\u{1D42D}\u{1D41E}\u{1D427}\u{1D41D}\u{1D428} \u{1D412}\u{1D430}\u{1D422}\u{1D42D}\u{1D41C}\u{1D421} \u{1D7F1} / \u{1D412}\u{1D430}\u{1D422}\u{1D42D}\u{1D41C}\u{1D421} \u{1D40E}\u{1D42D}\u{1D408}\u{1D403} / \u{1D412}\u{1D430}\u{1D422}\u{1D42D}\u{1D41C}\u{1D421} \u{1D7EF}';
+    bl  = '𝐅𝐨𝐫 𝐍𝐢𝐧𝐭𝐞𝐧𝐝𝐨 𝐒𝐰𝐢𝐭𝐜𝐡 𝟐 / 𝐒𝐰𝐢𝐭𝐜𝐡 𝐎𝐋𝐄𝐃 / 𝐒𝐰𝐢𝐭𝐜𝐡 𝟏';
+    ss  = 'Nintendo eShop';
+    nd  = 'Play on provided account (Offline only / Airplane Mode)';
+    ol  = '𝐎𝐟𝐟𝐢𝐜𝐢𝐚𝐥 𝐍𝐢𝐧𝐭𝐞𝐧𝐝𝐨 𝐈𝐧𝐟𝐨:';
+    ts  = 'Nintendo Switch 2 / Nintendo Switch 1 / Switch OLED - Digital Game Download NS1 NS2 Game Nintendo Switch Digital Games | Instant Delivery | Instant Access | Safe & Affordable | Normal & Premium Versions Available';
+    tag = 'Nintendo Switch';
+  } else if (platSel === 'ns2') {
+    bl  = '𝐅𝐨𝐫 𝐍𝐢𝐧𝐭𝐞𝐧𝐝𝐨 𝐒𝐰𝐢𝐭𝐜𝐡 𝟐';
+    ss  = 'Nintendo eShop';
+    nd  = 'Play on provided account (Offline only / Airplane Mode)';
+    ol  = '𝐎𝐟𝐟𝐢𝐜𝐢𝐚𝐥 𝐍𝐢𝐧𝐭𝐞𝐧𝐝𝐨 𝐈𝐧𝐟𝐨:';
+    ts  = 'Nintendo Switch 2 - Digital Game Download NS2 Game Nintendo Switch Digital Games | Instant Delivery | Instant Access | Safe & Affordable | Normal & Premium Versions Available';
+    tag = 'Nintendo Switch 2';
+  } else if (platSel === 'ps45') {
+    bl  = '𝐅𝐨𝐫 𝐏𝐥𝐚𝐲𝐒𝐭𝐚𝐭𝐢𝐨𝐧 𝟓 / 𝐏𝐥𝐚𝐲𝐬𝐭𝐚𝐭𝐢𝐨𝐧 𝟒';
+    ss  = 'PlayStation Store';
+    nd  = 'Play on provided account (Online only / Internet required)';
+    ol  = '𝐎𝐟𝐟𝐢𝐜𝐢𝐚𝐥 𝐏𝐥𝐚𝐲𝐒𝐭𝐚𝐭𝐢𝐨𝐧 𝐈𝐧𝐟𝐨:';
+    ts  = 'PlayStation 4 / PlayStation 5 - Digital Game Download PS4 PS5 PS Digital Games | Instant Delivery | Instant Access | Safe & Affordable | Normal & Premium Versions Available';
+    tag = 'PlayStation 5 / PlayStation 4';
+  } else if (platSel === 'ps5') {
+    bl  = '𝐅𝐨𝐫 𝐏𝐥𝐚𝐲𝐒𝐭𝐚𝐭𝐢𝐨𝐧 𝟓';
+    ss  = 'PlayStation Store';
+    nd  = 'Play on provided account (Online only / Internet required)';
+    ol  = '𝐎𝐟𝐟𝐢𝐜𝐢𝐚𝐥 𝐏𝐥𝐚𝐲𝐒𝐭𝐚𝐭𝐢𝐨𝐧 𝐈𝐧𝐟𝐨:';
+    ts  = 'PlayStation 5 - Digital Game Download PS5 PS Digital Games | Instant Delivery | Instant Access | Safe & Affordable | Normal & Premium Versions Available';
+    tag = 'PlayStation 5';
+  }
+
+  var txt =
+    '\u2705 ' + name + ' \u2013 ' + ts + '\n\n' +
+    name + ' (Standard Edition)\n\n' +
+    bl + '\n\n' +
+    '\uD83D\uDCB0 \uD835\uDC0F\uD835\uDC2B\uD835\uDC22\uD835\uDC1C\uD835\uDC22\uD835\uDC27\uD835\uDC20\n' +
+    '\uD83D\uDFE1 Normal Version - $' + np + '\n' +
+    '\uD83D\uDFE2 Premium Version - $' + pp + '\n\n' +
+    '\u2728 \uD835\uDC15\uD835\uDC1E\uD835\uDC2B\uD835\uDC2C\uD835\uDC22\uD835\uDC28\uD835\uDC27 \uD835\uDC03\uD835\uDC1E\uD835\uDC2D\uD835\uDC1A\uD835\uDC22\uD835\uDC25\uD835\uDC2C\n' +
+    '\uD83D\uDC9B Normal Version = ' + nd + '\n' +
+    '\uD83D\uDC9A Premium Version = Play on your own account (Online & Offline play supported)\n\n' +
+    '\u26A1 \uD835\uDC16\uD835\uDC21\uD835\uDC32 \uD835\uDC01\uD835\uDC2E\uD835\uDC32 \uD835\uDC05\uD835\uDC2B\uD835\uDC28\uD835\uDC26 \uD835\uDC0C\uD835\uDC1E?\n' +
+    '\u2705 Games are direct purchase from ' + ss + '\n' +
+    '\u2705 Instant delivery within 15 minutes after payment\n' +
+    '\u2705 Game is yours to play & keep forever\n' +
+    '\u2705 Safe, secure & affordable\n\n' +
+    '\uD83D\uDCE6 \uD835\uDC04\uD835\uDC31\uD835\uDC2D\uD835\uDC2B\uD835\uDC1A\uD835\uDC2C\n' +
+    '\t\u2022\tDLC / Deluxe Edition available (enquire for pricing)\n' +
+    '\t\u2022\tIf you don\'t see the game you want in my listings, feel free to ask!\n\n' +
+    '\uD83D\uDCB3 \uD835\uDC0F\uD835\uDC1A\uD835\uDC32\uD835\uDC26\uD835\uDC1E\uD835\uDC27\uD835\uDC2D \uD835\uDC0E\uD835\uDC29\uD835\uDC2D\uD835\uDC22\uD835\uDC28\uD835\uDC27\uD835\uDC2C\n' +
+    '\u2714\uFE0F PayNow / PayLah / NS Credits\n\n' +
+    '\u26A0\uFE0F \uD835\uDC0D\uD835\uDC28\uD835\uDC2D\uD835\uDC1E\n' +
+    'No refunds due to the nature of digital products, but we will make sure your game works smoothly.\n\n' +
+    '\uD83D\uDD17 \uD835\uDC05\uD835\uDC2E\uD835\uDC25\uD835\uDC25 \uD835\uDC06\uD835\uDC1A\uD835\uDC26\uD835\uDC1E \uD835\uDC0B\uD835\uDC22\uD835\uDC2C\uD835\uDC2D:\n' +
+    'www.tinyurl.com/imbbloh-switchgamelist\n\n' +
+    '\uD83D\uDD17 ' + ol + '\n' +
+    (su || '(add store URL)') + '\n\n' +
+    '\uD83C\uDFA5 \uD835\uDC06\uD835\uDC1A\uD835\uDC26\uD835\uDC1E\uD835\uDC29\uD835\uDC25\uD835\uDC1A\uD835\uDC32 \uD835\uDC13\uD835\uDC2B\uD835\uDC1A\uD835\uDC22\uD835\uDC25\uD835\uDC1E\uD835\uDC2B:\n' +
+    yt + '\n\n' +
+    'Tags: ' + tag + ' ' + name;
+
+  showOutput(txt);
+}
+
+// ── Code template ──────────────────────────────────────────────────────────
+function genCode(name) {
+  var price = el('codePrice').value;
+  if (!price) { showToast('Enter a price', true); return; }
+
+  var bl, tag;
+  if (platSel === 'ns12') {
+    bl  = '𝐅𝐨𝐫 𝐍𝐢𝐧𝐭𝐞𝐧𝐝𝐨 𝐒𝐰𝐢𝐭𝐜𝐡 𝟐 / 𝐒𝐰𝐢𝐭𝐜𝐡 𝐎𝐋𝐄𝐃 / 𝐒𝐰𝐢𝐭𝐜𝐡 𝟏';
+    tag = 'Nintendo Switch';
+  } else {
+    bl  = '𝐅𝐨𝐫 𝐍𝐢𝐧𝐭𝐞𝐧𝐝𝐨 𝐒𝐰𝐢𝐭𝐜𝐡 𝟐';
+    tag = 'Nintendo Switch 2';
+  }
+
+  var footer =
+    '\u2705 Instant Delivery (within 15 mins)\n' +
+    '\u2705 Code via Nintendo eShop (Region-Free)\n' +
+    'SG \uD83C\uDDF8\uD83C\uDDEC | US \uD83C\uDDFA\uD83C\uDDF8 | EU \uD83C\uDDEA\uD83C\uDDFA | HK \uD83C\uDDED\uD83C\uDDF0 | JP \uD83C\uDDEF\uD83C\uDDF5\n\n' +
+    '\uD83D\uDCB3 \uD835\uDC0F\uD835\uDC1A\uD835\uDC32\uD835\uDC26\uD835\uDC1E\uD835\uDC27\uD835\uDC2D \uD835\uDC0E\uD835\uDC29\uD835\uDC2D\uD835\uDC22\uD835\uDC28\uD835\uDC27\uD835\uDC2C\n' +
+    '\u2714\uFE0F PayNow / PayLah / NS Credits\n' +
+    '\u26A0\uFE0F No refund once code sent\n\n' +
+    '\uD83D\uDCFA Need Help to Redeem?\n' +
+    'youtu.be/ciujtwAh7NY?si=s4ENHl0ifuEVV56-\n\n' +
+    '\uD83D\uDD17 \uD835\uDC05\uD835\uDC2E\uD835\uDC25\uD835\uDC25 \uD835\uDC06\uD835\uDC1A\uD835\uDC26\uD835\uDC1E \uD835\uDC0B\uD835\uDC22\uD835\uDC2C\uD835\uDC2D:\n' +
+    'www.tinyurl.com/imbbloh-switchgamelist\n\n';
+
+  var hdrNS12 = '<DIGITAL CODE> ' + name + ' Nintendo Switch 1 OLED Switch 2 Edition NS 1 NS1 NS 2 NS2 Redemption Game Code Nintendo Eshop E shop Voucher Download Key';
+  var hdrNS2  = '<DIGITAL CODE> ' + name + ' Nintendo Switch 2 Edition NS 2 NS2 Redemption Game Code Nintendo Eshop E shop Voucher Download Key';
+  var hdrBase = platSel === 'ns2' ? hdrNS2 : hdrNS12;
+
+  var txt = '';
+
+  if (codeSub === 'dlc') {
+    txt =
+      hdrBase + ' (Upgrade Pack / DLC) [Nintendo Official Digital Codes]\n\n' +
+      name + ' (DLC) \u2013 Digital Game Code\n\n' +
+      bl + '\n\n' +
+      '\uD83D\uDD39DLC: ' + name + ' - $' + price + '\n\n' +
+      footer +
+      'Tags: ' + tag + ' DLC ' + name;
+
+  } else if (codeSub === 'upgrade') {
+    txt =
+      hdrNS2 + ' (Upgrade Pack / DLC) [Nintendo Official Digital Codes]\n\n' +
+      name + ' (Upgrade Pack) \u2013 Digital Game Code\n\n' +
+      bl + '\n\n' +
+      '\uD83D\uDD39 Upgrade Pack: Nintendo Switch 2 Edition - $' + price + '\n\n' +
+      footer +
+      'Tags: ' + tag + ' ' + name + ' Upgrade Pack';
+
+  } else {
+    txt =
+      hdrBase + ' [Nintendo Official Digital Codes]\n\n' +
+      name + ' \u2013 Digital Game Code\n\n' +
+      bl + '\n\n' +
+      footer +
+      'Tags: ' + tag + ' ' + name;
+  }
+
+  showOutput(txt);
+}
+
+// ── Show output ────────────────────────────────────────────────────────────
+function showOutput(txt) {
+  curCopy = txt;
+  el('outputText').textContent = txt;
+  el('outputCard').classList.add('visible');
+  el('syncRow').style.display = 'none';
+  el('saveBtn').disabled = false;
+  el('saveBtn').textContent = '\u2191 Save to Sheets';
+
+  // Store page button + Canva template button
+  var wrap = el('storeBtnWrap');
+  var su = el('storeUrl').value.trim();
+
+  var canvaLinks = {
+    ns12:    'DAGsTMK7LmQ',
+    ns2:     'DAGsTMK7LmQ',
+    ps45:    'DAG0MmfWtyI',
+    ps5:     'DAG0MmfWtyI',
+    code:    'DAG00T4ZR4Q'
+  };
+
+  var canvaKey = appMode === 'code' ? 'code' : platSel;
+  var canvaUrl = canvaLinks[canvaKey] || null;
+
+  // Show wrap if either button is relevant
+  if ((appMode === 'game' && su) || canvaUrl) {
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+
+  // Store button
+  var storeBtn = el('storeBtn');
+  if (appMode === 'game' && su) {
+    storeBtn.style.display = 'block';
+    var fullUrl = su.startsWith('http') ? su : 'https://' + su;
+    storeBtn.onclick = function() { window.open(fullUrl, '_blank'); };
+  } else {
+    storeBtn.style.display = 'none';
+  }
+
+  // Canva button — deep link opens app, fallback to web
+  var canvaBtn = el('canvaBtn');
+  if (canvaUrl) {
+    canvaBtn.style.display = 'block';
+    canvaBtn.onclick = function() {
+      window.open('https://www.canva.com/design/' + canvaUrl + '/edit', '_blank');
+    };
+  } else {
+    canvaBtn.style.display = 'none';
+  }
+
+  setTimeout(function() {
+    el('outputCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+// ── Copy ───────────────────────────────────────────────────────────────────
+function doCopy() {
+  if (!curCopy) return;
+  navigator.clipboard.writeText(curCopy).then(function() {
+    el('copyBtn').textContent = '\u2713 Copied!';
+    showToast('Copied!');
+    setTimeout(function() { el('copyBtn').textContent = '\u2398 Copy'; }, 2000);
+  });
+}
+
+// ── Save to Sheets ─────────────────────────────────────────────────────────
+function doSave() {
+  var name = el('gameName').value.trim();
+  if (!curCopy) return;
+
+  el('saveBtn').disabled = true;
+  el('saveBtn').textContent = 'Saving...';
+
+  var gmap = { ns12: 'Switch 1&2', ns2: 'Switch 2', ps45: 'PS4 & PS5', ps5: 'PS5' };
+  var cmap = { ns12: 'Switch 1&2', ns2: 'Switch 2' };
+
+  var fd = new FormData();
+  var isCode = appMode === 'code';
+
+  try {
+    if (isCode) {
+      var codeTitle = name;
+      if (codeSub === 'dlc')     codeTitle = name + ' (DLC)';
+      if (codeSub === 'upgrade') codeTitle = name + ' (Upgrade Pack)';
+      fd.append(CF.title,    codeTitle);
+      fd.append(CF.price,    el('codePrice').value);
+      fd.append(CF.platform, cmap[platSel]);
+      fetch(CODE_FORM, { method: 'POST', mode: 'no-cors', body: fd });
+    } else {
+      var su  = el('storeUrl').value.trim();
+      var surl = su ? (su.startsWith('http') ? su : 'https://' + su) : '';
+      fd.append(GF.title,    name);
+      fd.append(GF.normal,   el('normalPrice').value);
+      fd.append(GF.premium,  el('premiumPrice').value);
+      fd.append(GF.platform, gmap[platSel]);
+      fd.append(GF.url,      surl);
+      fetch(GAME_FORM, { method: 'POST', mode: 'no-cors', body: fd });
+    }
+
+    // Local save
+    var item = {
+      id:       Date.now(),
+      name:     name,
+      type:     isCode ? 'code' : 'game',
+      subtype:  isCode ? codeSub : null,
+      plat:     isCode ? cmap[platSel] : gmap[platSel],
+      np:       isCode ? null : parseFloat(el('normalPrice').value),
+      pp:       isCode ? null : parseFloat(el('premiumPrice').value),
+      cp:       isCode ? parseFloat(el('codePrice').value) : null,
+      copy:     curCopy,
+      date:     new Date().toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })
+    };
+
+    saved.unshift(item);
+    localStorage.setItem('ibl', JSON.stringify(saved));
+    renderList();
+
+    el('syncRow').style.display = 'flex';
+    el('syncMsg').textContent = 'Saved to Google Sheets \u00b7 ' + item.date;
+    el('saveBtn').textContent = '\u2713 Saved!';
+    showToast('Saved to Google Sheets!');
+
+    // Reset after delay
+    setTimeout(function() {
+      el('gameName').value  = '';
+      el('normalPrice').value = '';
+      el('premiumPrice').value = '';
+      el('codePrice').value = '';
+      el('storeUrl').value  = '';
+      el('storeUrl').style.color = '';
+      if (platSel) { el('p-' + platSel).classList.remove('sel'); platSel = null; }
+      curCopy = '';
+      el('outputCard').classList.remove('visible');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 1800);
+
+  } catch (e) {
+    el('saveBtn').disabled = false;
+    el('saveBtn').textContent = '\u2191 Save to Sheets';
+    showToast('Error \u2014 try again', true);
+  }
+}
+
+// ── Filter ─────────────────────────────────────────────────────────────────
+function setFilter(f) {
+  curFilt = f;
+  ['all', 'ns', 'ps'].forEach(function(id) {
+    el('filt-' + id).classList.toggle('on', id === f);
+  });
+  renderList();
+}
+
+// ── Render listings ────────────────────────────────────────────────────────
+function renderList() {
+  var box  = el('listBox');
+  var list = saved;
+
+  if (curFilt === 'ns') list = saved.filter(function(x) { return x.plat && x.plat.startsWith('Switch'); });
+  if (curFilt === 'ps') list = saved.filter(function(x) { return x.plat && x.plat.startsWith('PS'); });
+
+  if (!list.length) {
+    box.innerHTML = '<div class="empty-state"><div class="icon">🎮</div><p>No listings yet.<br>Generate your first one above.</p></div>';
+    return;
+  }
+
+  box.innerHTML = list.map(function(x) {
+    var isCode = x.type === 'code';
+    var isPS   = x.plat && x.plat.startsWith('PS');
+    var bc     = isCode ? 'b-code' : (isPS ? 'b-ps' : 'b-ns');
+    var bl     = isCode ? '\uD83D\uDD11 ' + (x.subtype === 'dlc' ? 'DLC' : x.subtype === 'upgrade' ? 'Upgrade' : 'Code') : x.plat;
+
+    var ph = isCode
+      ? '<div class="price-line p-single">\uD83D\uDCB0 $' + (x.cp || 0).toFixed(2) + '</div>'
+      : '<div class="price-line p-normal">\uD83D\uDFE1 $' + (x.np || 0).toFixed(2) + '</div>' +
+        '<div class="price-line p-premium">\uD83D\uDFE2 $' + (x.pp || 0).toFixed(2) + '</div>';
+
+    return '<div class="listing-item">' +
+      '<div class="listing-top">' +
+        '<div class="listing-name">' + x.name + '</div>' +
+        '<div class="listing-prices">' + ph + '</div>' +
+      '</div>' +
+      '<div class="listing-meta">' +
+        '<span class="badge ' + bc + '">' + bl + '</span>' +
+        '<span class="listing-date">' + x.date + '</span>' +
+      '</div>' +
+      '<div class="listing-actions">' +
+        '<button class="item-btn" data-copy="' + x.id + '">\u2398 Copy</button>' +
+        '<button class="item-btn" data-del="' + x.id + '">Remove</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function showToast(msg, isErr) {
+  var t = el('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' err' : '');
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2500);
+}
+
+// ── Event listeners ────────────────────────────────────────────────────────
+
+// Mode toggle
+el('btnGame').addEventListener('click', function() { setMode('game'); });
+el('btnCode').addEventListener('click', function() { setMode('code'); });
+
+// Platform pills
+['ns12', 'ns2', 'ps45', 'ps5'].forEach(function(p) {
+  el('p-' + p).addEventListener('click', function() { setPlat(p); });
+});
+
+// Code subtype pills
+['full', 'dlc', 'upgrade'].forEach(function(s) {
+  el('sub-' + s).addEventListener('click', function() { setSub(s); });
+});
+
+// Generate button
+el('genBtn').addEventListener('click', doGenerate);
+
+// Copy button
+el('copyBtn').addEventListener('click', doCopy);
+
+// Save button
+el('saveBtn').addEventListener('click', doSave);
+
+// Filter pills
+el('filt-all').addEventListener('click', function() { setFilter('all'); });
+el('filt-ns').addEventListener('click',  function() { setFilter('ns'); });
+el('filt-ps').addEventListener('click',  function() { setFilter('ps'); });
+
+// Game name input — auto URL + enter to generate
+el('gameName').addEventListener('input', function() {
+  if (appMode === 'game') autoUrl();
+});
+el('gameName').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doGenerate();
+});
+
+// Store URL — reset colour when manually edited
+el('storeUrl').addEventListener('input', function() {
+  this.style.color = '';
+});
+
+// Delegate copy/remove in listings
+el('listBox').addEventListener('click', function(e) {
+  var btn = e.target.closest('.item-btn');
+  if (!btn) return;
+  var cid = btn.getAttribute('data-copy');
+  var did = btn.getAttribute('data-del');
+  if (cid) {
+    var item = saved.find(function(x) { return x.id === parseInt(cid); });
+    if (item && item.copy) {
+      navigator.clipboard.writeText(item.copy).then(function() { showToast('Listing copied!'); });
+    }
+  }
+  if (did) {
+    saved = saved.filter(function(x) { return x.id !== parseInt(did); });
+    localStorage.setItem('ibl', JSON.stringify(saved));
+    renderList();
+    showToast('Removed');
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+renderList();
+</script>
+</body>
+</html>

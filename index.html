@@ -889,7 +889,7 @@ function doCopy() {
 
 // ── Save to Sheets ─────────────────────────────────────────────────────────
 function doSave() {
-  var name = el('gameName').value.trim();
+  var name = cleanTitle(el('gameName').value.trim());
   if (!curCopy) return;
 
   el('saveBtn').disabled = true;

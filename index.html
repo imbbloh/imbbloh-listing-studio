@@ -660,10 +660,9 @@ function autoUrl() {
 
 // ── Generate ───────────────────────────────────────────────────────────────
 function cleanTitle(s) {
-  // Strip trademark / copyright symbols, then normalise accented chars (é→e etc.)
   return s
-    .replace(/[™®©]/g, '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[\u2122\u00ae\u00a9]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .trim();
 }
 

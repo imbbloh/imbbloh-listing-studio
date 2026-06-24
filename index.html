@@ -659,10 +659,20 @@ function autoUrl() {
 }
 
 // ── Generate ───────────────────────────────────────────────────────────────
+function cleanTitle(s) {
+  // Strip trademark / copyright symbols, then normalise accented chars (é→e etc.)
+  return s
+    .replace(/[™®©]/g, '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim();
+}
+
 function doGenerate() {
-  var name = el('gameName').value.trim();
-  if (!name)    { showToast('Enter a game title', true); return; }
+  var raw  = el('gameName').value.trim();
+  if (!raw)     { showToast('Enter a game title', true); return; }
   if (!platSel) { showToast('Select a platform', true); return; }
+
+  var name = cleanTitle(raw); // remove ™ / ® / © and normalise é→e etc.
 
   if (appMode === 'code') {
     genCode(name);

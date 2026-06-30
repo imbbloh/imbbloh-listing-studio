@@ -2,3 +2,7 @@ node_modules/
 bot/node_modules/
 .env
 bot/.env
+*.session
+*.session-journal
+__pycache__/
+*.pyc

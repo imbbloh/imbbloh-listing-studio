@@ -85,15 +85,24 @@ async def _click_button_matching(msg: Message, *keywords: str) -> bool:
 async def post_to_carousell(session: ListingSession) -> Optional[str]:
     """
     Drive the @CarousellOfficialBot conversation to post a listing draft.
-    Returns the Carousell listing URL on success, or None.
+
+    @CarousellOfficialBot is triggered by a first message whose first line
+    is in the format:  Title $Price
+    e.g.  "Mario Kart World NS2 $9.90"
+
+    Returns the Carousell listing/edit URL on success, or None.
     """
     async with client.conversation(CAROUSELL_BOT, timeout=120) as conv:
 
-        # ── 1. Wake the bot ────────────────────────────────────────────────
-        await conv.send_message('/start')
+        # ── 1. Trigger draft with "Title $Price" on the first line ─────────
+        # Additional context (description) can follow on subsequent lines.
+        trigger = f'{session.title} ${session.price}'
+        if session.description:
+            trigger += f'\n\n{session.description}'
+        await conv.send_message(trigger)
         resp: Message = await conv.get_response()
 
-        # If the bot asks us to link account, surface the message and abort
+        # If account not linked, surface the bot's message and abort
         lower = resp.raw_text.lower()
         if any(w in lower for w in ('link', 'connect', 'sign in', 'log in')):
             await client.send_message(
@@ -110,32 +119,22 @@ async def post_to_carousell(session: ListingSession) -> Optional[str]:
             await conv.send_file(path)
             await asyncio.sleep(0.8)
 
-        # ── 3. Walk through prompts ────────────────────────────────────────
+        # ── 3. Walk through any remaining prompts ──────────────────────────
         for _ in range(15):  # safety cap
             resp = await conv.get_response()
             lower = resp.raw_text.lower()
 
-            # Detect publish/preview screen
-            if any(w in lower for w in ('publish', 'post', 'confirm', 'preview')):
-                clicked = await _click_button_matching(resp, 'publish', 'post', 'confirm')
+            # Detect publish / preview screen — click Publish button
+            if any(w in lower for w in ('publish', 'post', 'confirm', 'preview', 'draft')):
+                clicked = await _click_button_matching(resp, 'publish', 'post', 'confirm', 'draft')
                 if not clicked:
                     await conv.send_message('Publish')
                 resp = await conv.get_response()
                 break
 
-            # Title / name
-            if any(w in lower for w in ('title', 'name', 'what are you selling')):
-                await conv.send_message(session.title)
-                continue
-
-            # Price
-            if 'price' in lower:
+            # Price — in case the bot asks for it separately
+            if 'price' in lower and not any(w in lower for w in ('title', 'name')):
                 await conv.send_message(session.price)
-                continue
-
-            # Description
-            if any(w in lower for w in ('description', 'describe', 'detail')):
-                await conv.send_message(session.description)
                 continue
 
             # Condition — try button first, fall back to text
@@ -145,7 +144,7 @@ async def post_to_carousell(session: ListingSession) -> Optional[str]:
                     await conv.send_message(session.condition)
                 continue
 
-            # Category — if prompted, pick the first/default button or reply
+            # Category — pick matching button or default to first
             if 'category' in lower:
                 if resp.buttons:
                     await resp.buttons[0][0].click()
@@ -153,17 +152,21 @@ async def post_to_carousell(session: ListingSession) -> Optional[str]:
                     await conv.send_message('Video Games')
                 continue
 
-            # Unrecognised prompt — skip (send empty to avoid stalling)
+            # Description — if asked separately
+            if any(w in lower for w in ('description', 'describe', 'detail')):
+                await conv.send_message(session.description or session.title)
+                continue
+
+            # Unrecognised prompt with buttons — pick first
             if resp.buttons:
                 await resp.buttons[0][0].click()
 
-        # ── 4. Extract listing URL ─────────────────────────────────────────
+        # ── 4. Extract listing URL from final response ─────────────────────
         text = resp.raw_text
         match = re.search(r'https?://(?:www\.)?carousell\.[a-z.]+/p/\S+', text)
         if match:
             return match.group(0).rstrip('.')
 
-        # Also check for bare URL
         match = re.search(r'carousell\.[a-z.]+/p/\d+', text)
         if match:
             return 'https://www.' + match.group(0)

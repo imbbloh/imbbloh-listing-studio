@@ -1,7 +1,9 @@
 const FRAME_URL = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/ns-template-frame.png';
+const FONT_URL  = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/gagalin.ttf';
 const CANVAS_W  = 1080;
 const CANVAS_H  = 1080;
-const COVER_H   = 935;   // cover art fills from y=0 to where the bottom bar begins
+const COVER_Y   = 295;   // top of transparent window in frame PNG
+const COVER_H   = 640;   // height of window (y=295 to y=935)
 const TITLE_Y   = 1008;  // vertical centre of title text in the bottom bar
 
 // ── Font size for title text (1080px-wide bottom bar) ─────────────────────
@@ -38,17 +40,20 @@ function toBase64(buffer) {
 // ── Build thumbnail SVG ────────────────────────────────────────────────────
 // Layer order (bottom → top):
 //   [1] Red background (full canvas)
-//   [2] Cover art      (full width, y=0 to COVER_H)
+//   [2] Cover art      (full width, y=COVER_Y, height=COVER_H — matches transparent window)
 //   [3] Frame PNG      (transparent cover window lets cover art show through)
-//   [4] Title text     (white uppercase bold, centred in bottom bar)
-function buildThumbnailSvg(gameTitle, coverBase64, frameBase64) {
+//   [4] Title text     (white uppercase Gagalin bold, centred in bottom bar)
+function buildThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
   const fs    = titleFontSize(gameTitle);
   const title = escapeXml(gameTitle.toUpperCase());
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+  <defs>
+    <style>@font-face { font-family: 'Gagalin'; src: url('data:font/truetype;base64,${fontBase64}'); }</style>
+  </defs>
   <rect width="${CANVAS_W}" height="${CANVAS_H}" fill="#e8001d"/>
-  <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="0" width="${CANVAS_W}" height="${COVER_H}" preserveAspectRatio="xMidYMid slice"/>
+  <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="${COVER_Y}" width="${CANVAS_W}" height="${COVER_H}" preserveAspectRatio="xMidYMid slice"/>
   <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}"/>
-  <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fs}" font-family="'Arial Black',Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle">${title}</text>
+  <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fs}" font-family="Gagalin,Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle">${title}</text>
 </svg>`;
 }
 
@@ -114,21 +119,24 @@ export default {
       const { platform, nsuid, hash } = extractNintendoAssets(html);
       const cdn = buildCdnUrls(platform, nsuid, hash);
 
-      // ── Step 2: Fetch cover image and template frame in parallel ───────
-      const [imgRes, frameRes] = await Promise.all([
+      // ── Step 2: Fetch cover image, template frame, and font in parallel ─
+      const [imgRes, frameRes, fontRes] = await Promise.all([
         fetch(cdn.upload),
-        fetch(FRAME_URL)
+        fetch(FRAME_URL),
+        fetch(FONT_URL)
       ]);
       if (!imgRes.ok)   throw new Error('Cover image fetch failed: ' + imgRes.status);
       if (!frameRes.ok) throw new Error('Template frame fetch failed: ' + frameRes.status);
+      if (!fontRes.ok)  throw new Error('Font fetch failed: ' + fontRes.status);
 
-      const [coverBase64, frameBase64] = await Promise.all([
+      const [coverBase64, frameBase64, fontBase64] = await Promise.all([
         imgRes.arrayBuffer().then(toBase64),
-        frameRes.arrayBuffer().then(toBase64)
+        frameRes.arrayBuffer().then(toBase64),
+        fontRes.arrayBuffer().then(toBase64)
       ]);
 
       // ── Step 3: Build SVG thumbnail ────────────────────────────────────
-      const svg = buildThumbnailSvg(gameTitle, coverBase64, frameBase64);
+      const svg = buildThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64);
       const thumbnailDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 
       // ── Step 4: Return ─────────────────────────────────────────────────

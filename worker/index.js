@@ -1,9 +1,9 @@
 const FRAME_URL = 'https://imbbloh.github.io/imbbloh-listing-studio/assets/ns-template-frame.png';
 const CANVAS_W  = 1080;
 const CANVAS_H  = 1080;
-const COVER_Y   = 0;    // cover art starts at top; frame overlays the header
-const COVER_H   = 940;  // cover art ends before the bottom title bar
-const TITLE_Y   = 1010; // vertical center of title text inside bottom bar
+const COVER_Y   = 295;   // top of black cover window in the frame PNG
+const COVER_H   = 640;   // height of cover window (reaches y=935)
+const TITLE_Y   = 1008;  // vertical centre of title text in the bottom bar
 
 // ── Font size for title text (1080px-wide bottom bar) ─────────────────────
 function titleFontSize(title) {
@@ -39,16 +39,28 @@ function toBase64(buffer) {
 // ── Build thumbnail SVG ────────────────────────────────────────────────────
 // Layer order (bottom → top):
 //   [1] Red background (full canvas)
-//   [2] Cover art      (full width, y=0 to COVER_H; frame overlays header)
-//   [3] Template frame (transparent PNG with all static branding)
+//   [2] Cover art      (x=0, y=COVER_Y, fills the black window in the frame)
+//   [3] Frame PNG      (clipped to header strip + bottom bar; black window excluded)
 //   [4] Title text     (white uppercase bold, centred in bottom bar)
+//
+// The frame PNG is an opaque export from Canva (no transparent background needed).
+// SVG clipPath masks it to only the header and bottom bar, letting the cover art
+// show through where the black window was.
 function buildThumbnailSvg(gameTitle, coverBase64, frameBase64) {
-  const fs    = titleFontSize(gameTitle);
-  const title = escapeXml(gameTitle.toUpperCase());
+  const fs      = titleFontSize(gameTitle);
+  const title   = escapeXml(gameTitle.toUpperCase());
+  const barY    = COVER_Y + COVER_H;               // y where bottom bar starts (935)
+  const barH    = CANVAS_H - barY;                 // height of bottom bar strip (145)
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+  <defs>
+    <clipPath id="frameClip">
+      <rect x="0" y="0"    width="${CANVAS_W}" height="${COVER_Y}"/>
+      <rect x="0" y="${barY}" width="${CANVAS_W}" height="${barH}"/>
+    </clipPath>
+  </defs>
   <rect width="${CANVAS_W}" height="${CANVAS_H}" fill="#e8001d"/>
   <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="${COVER_Y}" width="${CANVAS_W}" height="${COVER_H}" preserveAspectRatio="xMidYMid slice"/>
-  <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}"/>
+  <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}" clip-path="url(#frameClip)"/>
   <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fs}" font-family="'Arial Black',Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle">${title}</text>
 </svg>`;
 }

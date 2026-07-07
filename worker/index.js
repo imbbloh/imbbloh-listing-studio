@@ -1,51 +1,58 @@
 // ── Constants ──────────────────────────────────────────────────────────────
-const TEMPLATE_ID    = 'DAHG7ZFb7_k';
-const COVER_ELEMENT  = 'PBBMg0PBzsN5P8bS-LBWwC6v2gppr4vRT';
-const TITLE_ELEMENT  = 'PBBMg0PBzsN5P8bS-LB5xlCmLRvrG2wpc';
 const CANVA_API = 'https://api.canva.com/rest/v1';
 
 // ── Font size by title character count ───────────────────────────────────
 function fontSize(title) {
   const n = title.length;
-  if (n <= 17) return 100;
-  if (n <= 23) return 85;
-  if (n <= 25) return 82;
-  if (n <= 46) return 65;
-  if (n <= 47) return 50;
-  if (n <= 71) return 45;
-  return 40;
+  if (n <= 17) return 72;
+  if (n <= 23) return 62;
+  if (n <= 25) return 58;
+  if (n <= 46) return 46;
+  if (n <= 47) return 38;
+  if (n <= 71) return 34;
+  return 28;
 }
 
-// ── Canva REST API helper ─────────────────────────────────────────────────
-async function canva(method, path, body, token) {
-  const res = await fetch(CANVA_API + path, {
-    method,
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json'
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error('Canva ' + path + ' → ' + JSON.stringify(json));
-  return json;
+// ── Escape XML special characters ─────────────────────────────────────────
+function escapeXml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-// ── Poll export until done ─────────────────────────────────────────────────
-async function pollExport(exportId, token, maxMs = 30000) {
-  const deadline = Date.now() + maxMs;
-  while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, 1500));
-    const res = await canva('GET', '/exports/' + exportId, null, token);
-    if (res.job?.status === 'success') return res.job.urls;
-    if (res.job?.status === 'failed') throw new Error('Export failed');
+// ── ArrayBuffer → base64 (chunked to avoid stack overflow) ───────────────
+function toBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
-  throw new Error('Export timed out');
+  return btoa(binary);
+}
+
+// ── Build thumbnail SVG ────────────────────────────────────────────────────
+// Layout (1280×720):
+//   0–90  : dark top bar — game title centred
+//  90–632 : cover art (white letterbox + image)
+// 632–720 : red bottom bar — "NINTENDO SWITCH"
+function buildThumbnailSvg(gameTitle, coverBase64) {
+  const fs = fontSize(gameTitle);
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#0a0a1a"/>
+  <rect x="40" y="90" width="1200" height="542" fill="white" rx="6"/>
+  <image href="data:image/jpeg;base64,${coverBase64}" x="40" y="90" width="1200" height="542" preserveAspectRatio="xMidYMid meet"/>
+  <rect x="0" y="0" width="1280" height="90" fill="#0a0a1a"/>
+  <text x="640" y="45" fill="white" font-size="${fs}" font-family="Arial,Helvetica,sans-serif" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${escapeXml(gameTitle)}</text>
+  <rect x="0" y="632" width="1280" height="88" fill="#e63946"/>
+  <text x="640" y="676" fill="white" font-size="26" font-family="Arial,Helvetica,sans-serif" font-weight="bold" text-anchor="middle" dominant-baseline="middle" letter-spacing="4">NINTENDO SWITCH</text>
+</svg>`;
 }
 
 // ── Extract NSUID + hash from Nintendo store HTML ─────────────────────────
 function extractNintendoAssets(html) {
-  // Matches CDN paths like store/software/switch/70010000012332/abc123hash
   const re = /store\/software\/(switch2?)\/(\d{14})\/([a-zA-Z0-9_-]{20,})/;
   const m = html.match(re);
   if (!m) throw new Error('Could not extract NSUID/hash from store page');
@@ -53,7 +60,7 @@ function extractNintendoAssets(html) {
 }
 
 function buildCdnUrls(platform, nsuid, hash) {
-  const base = `https://assets.nintendo.com/image/upload`;
+  const base = 'https://assets.nintendo.com/image/upload';
   const path = `store/software/${platform}/${nsuid}/${hash}`;
   return {
     upload:     `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${path}`,
@@ -79,11 +86,9 @@ function corsResponse(body, status = 200) {
 // ── Main handler ──────────────────────────────────────────────────────────
 export default {
   async fetch(request, env) {
-    // Preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS });
     }
-
     if (request.method !== 'POST') {
       return corsResponse({ error: 'Method not allowed' }, 405);
     }
@@ -95,11 +100,6 @@ export default {
     } catch (e) {
       return corsResponse({ error: e.message }, 400);
     }
-
-    const token = env.CANVA_TOKEN;
-    if (!token) return corsResponse({ error: 'CANVA_TOKEN not configured' }, 500);
-
-    let sessionId = null;
 
     try {
       // ── Step 1: Fetch Nintendo store page ─────────────────────────────
@@ -113,109 +113,23 @@ export default {
       const { platform, nsuid, hash } = extractNintendoAssets(html);
       const cdn = buildCdnUrls(platform, nsuid, hash);
 
-      // ── Step 2: Parallel — fetch cover image + start editing transaction ─
-      const [imgFetch, txRes] = await Promise.all([
-        fetch(cdn.upload),
-        canva('POST', `/designs/${TEMPLATE_ID}/editing-sessions`, {}, token)
-      ]);
-      if (!imgFetch.ok) throw new Error('Cover image fetch failed: ' + imgFetch.status);
-      const imgBuffer = await imgFetch.arrayBuffer();
+      // ── Step 2: Fetch cover image ──────────────────────────────────────
+      const imgRes = await fetch(cdn.upload);
+      if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);
+      const coverBase64 = toBase64(await imgRes.arrayBuffer());
 
-      // Upload binary to Canva (octet-stream, not JSON)
-      const uploadRaw = await fetch(
-        `${CANVA_API}/asset-uploads?name=${encodeURIComponent(gameTitle)}`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/octet-stream' },
-          body: imgBuffer
-        }
-      );
-      const uploadRes = await uploadRaw.json();
-      if (!uploadRaw.ok) throw new Error('Canva /asset-uploads → ' + JSON.stringify(uploadRes));
+      // ── Step 3: Build SVG thumbnail ────────────────────────────────────
+      const svg = buildThumbnailSvg(gameTitle, coverBase64);
+      const thumbnailDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 
-      let assetId = uploadRes.job?.id
-        ?? uploadRes.asset?.id
-        ?? (() => { throw new Error('No asset ID in upload response: ' + JSON.stringify(uploadRes)); })();
-      sessionId = txRes.transaction?.transaction_id
-        ?? (() => { throw new Error('No transaction ID in response: ' + JSON.stringify(txRes)); })();
-
-      const pages = txRes.pages;
-      if (!pages?.length) throw new Error('No pages in transaction response: ' + JSON.stringify(txRes));
-
-      // Wait for upload to complete if it's async
-      if (uploadRes.job?.status === 'in_progress') {
-        const deadline = Date.now() + 15000;
-        let uploadDone = false;
-        while (Date.now() < deadline) {
-          await new Promise(r => setTimeout(r, 1000));
-          const poll = await canva('GET', '/asset-uploads/' + assetId, null, token);
-          if (poll.job?.status === 'success') {
-            assetId = poll.job.asset?.id ?? assetId;
-            uploadDone = true;
-            break;
-          }
-          if (poll.job?.status === 'failed') throw new Error('Cover upload failed');
-        }
-        if (!uploadDone) throw new Error('Cover upload timed out');
-      }
-
-      // ── Step 3: Bundled edit ──────────────────────────────────────────
-      await canva('PATCH', `/designs/${TEMPLATE_ID}/editing-sessions/${sessionId}`, {
-        transaction_id: sessionId,
-        page_index: 1,
-        pages,
-        operations: [
-          {
-            type: 'update_fill',
-            element_id: COVER_ELEMENT,
-            asset_type: 'image',
-            asset_id: assetId,
-            alt_text: gameTitle
-          },
-          {
-            type: 'replace_text',
-            element_id: TITLE_ELEMENT,
-            text: gameTitle
-          },
-          {
-            type: 'format_text',
-            element_id: TITLE_ELEMENT,
-            formatting: { font_size: fontSize(gameTitle) }
-          }
-        ]
-      }, token);
-
-      // ── Step 4: Commit ────────────────────────────────────────────────
-      await canva('POST', `/designs/${TEMPLATE_ID}/editing-sessions/${sessionId}/commit`, {}, token);
-      sessionId = null; // committed — no need to cancel on error
-
-      // ── Step 5: Export pages 1 and 10 ────────────────────────────────
-      const exportRes = await canva('POST', '/exports', {
-        design_id: TEMPLATE_ID,
-        format: 'png',
-        pages: [1, 10]
-      }, token);
-
-      const exportId = exportRes.job?.id ?? exportRes.export_id;
-      if (!exportId) throw new Error('No export ID: ' + JSON.stringify(exportRes));
-
-      const exportUrls = await pollExport(exportId, token);
-
-      // ── Step 6: Return copy links ──────────────────────────────────────
+      // ── Step 4: Return ─────────────────────────────────────────────────
       return corsResponse({
-        thumbnailUrl:   exportUrls[0] ?? '',
-        nsInfoUrl:      exportUrls[1] ?? '',
-        coverUrl:       cdn.display,
-        screenshotUrl:  cdn.screenshot
+        thumbnailDataUrl,
+        coverUrl:      cdn.display,
+        screenshotUrl: cdn.screenshot
       });
 
     } catch (err) {
-      // Cancel transaction if still open
-      if (sessionId) {
-        try {
-          await canva('DELETE', `/designs/${TEMPLATE_ID}/editing-sessions/${sessionId}`, null, token);
-        } catch (_) { /* best-effort cancel */ }
-      }
       return corsResponse({ error: err.message }, 500);
     }
   }

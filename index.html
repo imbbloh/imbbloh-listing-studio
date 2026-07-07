@@ -521,7 +521,12 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 
   <!-- Thumbnail Links -->
   <div class="card" id="thumbCard" style="display:none">
-    <div class="card-title">📋 Copy Links</div>
+    <div class="card-title">🖼️ Thumbnail</div>
+    <img id="thumbPreview" style="width:100%;border-radius:6px;margin-bottom:12px" alt="Thumbnail preview"/>
+    <div style="margin-bottom:12px">
+      <button class="btn-thumb" id="thumbDownloadBtn" style="margin-right:8px">⬇ Download PNG</button>
+    </div>
+    <div class="card-title" style="margin-top:4px">📋 Copy Links</div>
     <pre class="thumb-links" id="thumbLinks"></pre>
   </div>
 
@@ -1139,11 +1144,13 @@ el('thumbBtn').addEventListener('click', async function() {
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Worker error ' + res.status);
 
-    el('thumbLinks').textContent =
-      'Thumbnail:\n' + (data.thumbnailUrl || '') +
-      '\n\nScreenshots:\n' + (data.coverUrl || '') +
-      '\n' + (data.nsInfoUrl || '') +
-      (data.screenshotUrl ? '\n' + data.screenshotUrl : '');
+    var thumbImg = el('thumbPreview');
+    thumbImg.src = data.thumbnailDataUrl;
+
+    var links = '';
+    if (data.coverUrl) links += 'Cover:\n' + data.coverUrl;
+    if (data.screenshotUrl) links += '\n\nScreenshot:\n' + data.screenshotUrl;
+    el('thumbLinks').textContent = links;
 
     el('thumbCard').style.display = 'block';
     btn.textContent = '✓ Done';
@@ -1157,6 +1164,25 @@ el('thumbBtn').addEventListener('click', async function() {
     btn.textContent = '🖼️ Generate Thumbnail';
     showToast(e.message || 'Thumbnail failed', true);
   }
+});
+
+// ── Thumbnail PNG download ─────────────────────────────────────────────────
+el('thumbDownloadBtn').addEventListener('click', function() {
+  var img = el('thumbPreview');
+  if (!img.src) return;
+  var canvas = document.createElement('canvas');
+  canvas.width = 1280;
+  canvas.height = 720;
+  var ctx = canvas.getContext('2d');
+  var image = new Image();
+  image.onload = function() {
+    ctx.drawImage(image, 0, 0, 1280, 720);
+    var a = document.createElement('a');
+    a.download = (el('gameName').value.trim() || 'thumbnail') + '.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+  image.src = img.src;
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────

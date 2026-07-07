@@ -54,7 +54,7 @@ function buildThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
   <rect width="${CANVAS_W}" height="${CANVAS_H}" fill="#e8001d"/>
   <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="${COVER_Y}" width="${CANVAS_W}" height="${COVER_H}" preserveAspectRatio="xMidYMid slice"/>
   <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}"/>
-  <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fs}" font-family="Gagalin,Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle">${title}</text>
+  <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fs}" font-family="Gagalin,Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle" letter-spacing="4">${title}</text>
 </svg>`;
 }
 

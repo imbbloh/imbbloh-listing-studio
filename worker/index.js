@@ -1,5 +1,6 @@
-const FRAME_URL = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/ns-template-frame.png';
-const FONT_URL  = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/gagalin.otf';
+// Pinned to commit SHA so jsDelivr caches permanently; no raw.githubusercontent.com rate limits
+const FRAME_URL = 'https://cdn.jsdelivr.net/gh/imbbloh/imbbloh-listing-studio@54b9ae1/assets/ns-template-frame.png';
+const FONT_URL  = 'https://cdn.jsdelivr.net/gh/imbbloh/imbbloh-listing-studio@54b9ae1/assets/gagalin.otf';
 const CANVAS_W  = 1080;
 const CANVAS_H  = 1080;
 const COVER_Y   = 295;   // top of transparent window in frame PNG
@@ -120,13 +121,10 @@ export default {
       const cdn = buildCdnUrls(platform, nsuid, hash);
 
       // ── Step 2: Fetch cover image, template frame, and font in parallel ─
-      // Static assets (frame + font) are cached at Cloudflare edge for 24h
-      // to avoid raw.githubusercontent.com rate limits (429).
-      const CACHE_OPTS = { cf: { cacheTtl: 86400, cacheEverything: true } };
       const [imgRes, frameRes, fontRes] = await Promise.all([
         fetch(cdn.upload),
-        fetch(FRAME_URL, CACHE_OPTS),
-        fetch(FONT_URL,  CACHE_OPTS)
+        fetch(FRAME_URL),
+        fetch(FONT_URL)
       ]);
       if (!imgRes.ok)   throw new Error('Cover image fetch failed: ' + imgRes.status);
       if (!frameRes.ok) throw new Error('Template frame fetch failed: ' + frameRes.status);

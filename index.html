@@ -369,6 +369,26 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 .empty-state .icon { font-size: 2.2rem; margin-bottom: 10px; }
 .empty-state p { font-size: 0.82rem; }
 
+/* ── Thumbnail Button ── */
+.btn-thumb {
+  display: block;
+  width: 100%; padding: 11px; border-radius: 9px;
+  background: var(--surface2); border: 1px solid #ff6b35; color: #ff8c5a;
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase;
+  cursor: pointer; text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-thumb:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-thumb:active:not(:disabled) { background: rgba(255,107,53,0.1); }
+
+.thumb-links {
+  display: block; padding: 14px 18px;
+  font-family: 'DM Mono', monospace; font-size: 0.72rem; line-height: 1.8;
+  white-space: pre-wrap; word-break: break-all; color: var(--text);
+  border-top: 1px solid var(--border);
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed; bottom: 24px; left: 50%;
@@ -494,6 +514,15 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
       <button class="btn-copy" id="copyBtn">⎘ Copy</button>
       <button class="btn-save" id="saveBtn">↑ Save to Sheets</button>
     </div>
+    <div style="padding: 0 18px 14px; display:none" id="thumbBtnWrap">
+      <button class="btn-thumb" id="thumbBtn">🖼 Generate Thumbnail</button>
+    </div>
+  </div>
+
+  <!-- Thumbnail Links -->
+  <div class="card" id="thumbCard" style="display:none">
+    <div class="card-title">📋 Copy Links</div>
+    <pre class="thumb-links" id="thumbLinks"></pre>
   </div>
 
   <!-- Listings -->
@@ -828,6 +857,13 @@ function showOutput(txt) {
   el('saveBtn').disabled = false;
   el('saveBtn').textContent = '\u2191 Save to Sheets';
 
+  // Thumbnail button \u2014 NS game mode only
+  var isNS = appMode === 'game' && (platSel === 'ns12' || platSel === 'ns2');
+  el('thumbBtnWrap').style.display = isNS ? 'block' : 'none';
+  el('thumbBtn').disabled = false;
+  el('thumbBtn').textContent = '\ud83d\uddbc\ufe0f Generate Thumbnail';
+  el('thumbCard').style.display = 'none';
+
   // Store page button + Canva template button
   var wrap = el('storeBtnWrap');
   var su = el('storeUrl').value.trim();
@@ -954,6 +990,7 @@ function doSave() {
       if (platSel) { el('p-' + platSel).classList.remove('sel'); platSel = null; }
       curCopy = '';
       el('outputCard').classList.remove('visible');
+      el('thumbCard').style.display = 'none';
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 1800);
 
@@ -1083,6 +1120,51 @@ el('listBox').addEventListener('click', function(e) {
     localStorage.setItem('ibl', JSON.stringify(saved));
     renderList();
     showToast('Removed');
+  }
+});
+
+// ── Thumbnail generation ───────────────────────────────────────────────────
+var THUMB_WORKER = 'https://imbbloh-thumbnail-worker.REPLACE_WITH_YOUR_SUBDOMAIN.workers.dev';
+
+el('thumbBtn').addEventListener('click', async function() {
+  var btn = el('thumbBtn');
+  var storeUrl = el('storeUrl').value.trim();
+  var gameTitle = el('gameName').value.trim();
+
+  if (!storeUrl) { showToast('Store URL missing — generate listing first', true); return; }
+  if (!gameTitle) { showToast('No game title', true); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  el('thumbCard').style.display = 'none';
+
+  try {
+    var res = await fetch(THUMB_WORKER, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeUrl: storeUrl, gameTitle: gameTitle })
+    });
+
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Worker error ' + res.status);
+
+    el('thumbLinks').textContent =
+      'Thumbnail:\n' + (data.thumbnailUrl || '') +
+      '\n\nScreenshots:\n' + (data.coverUrl || '') +
+      '\n' + (data.nsInfoUrl || '') +
+      (data.screenshotUrl ? '\n' + data.screenshotUrl : '');
+
+    el('thumbCard').style.display = 'block';
+    btn.textContent = '✓ Done';
+    showToast('Thumbnail ready!');
+    setTimeout(function() {
+      el('thumbCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '🖼️ Generate Thumbnail';
+    showToast(e.message || 'Thumbnail failed', true);
   }
 });
 

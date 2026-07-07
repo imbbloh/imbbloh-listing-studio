@@ -1,8 +1,8 @@
 const FRAME_URL = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/ns-template-frame.png';
 const CANVAS_W  = 1080;
 const CANVAS_H  = 1080;
-const COVER_Y   = 295;   // top of black cover window in the frame PNG
-const COVER_H   = 640;   // height of cover window (reaches y=935)
+const COVER_Y   = 320;   // top of black cover window in the frame PNG
+const COVER_H   = 615;   // height of cover window (reaches y=935)
 const TITLE_Y   = 1008;  // vertical centre of title text in the bottom bar
 
 // ── Font size for title text (1080px-wide bottom bar) ─────────────────────

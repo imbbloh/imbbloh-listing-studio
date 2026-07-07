@@ -1158,7 +1158,11 @@ el('thumbBtn').addEventListener('click', async function() {
 
     var links = '';
     if (data.coverUrl) links += 'Cover:\n' + data.coverUrl;
-    if (data.screenshotUrl) links += '\n\nScreenshot:\n' + data.screenshotUrl;
+    if (data.screenshotUrls && data.screenshotUrls.length) {
+      data.screenshotUrls.forEach(function(url, i) {
+        links += '\n\nScreenshot ' + (i + 1) + ':\n' + url;
+      });
+    }
     el('thumbLinks').textContent = links;
 
     el('thumbCard').style.display = 'block';

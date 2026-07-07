@@ -58,21 +58,26 @@ function buildThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
 </svg>`;
 }
 
-// ── Extract NSUID + hash from Nintendo store HTML ─────────────────────────
+// ── Extract NSUID + all asset hashes from Nintendo store HTML ─────────────
 function extractNintendoAssets(html) {
-  const re = /store\/software\/(switch2?)\/(\d{14})\/([a-zA-Z0-9_-]{20,})/;
-  const m = html.match(re);
-  if (!m) throw new Error('Could not extract NSUID/hash from store page');
-  return { platform: m[1], nsuid: m[2], hash: m[3] };
+  const re = /store\/software\/(switch2?)\/(\d{14})\/([a-zA-Z0-9_-]{20,})/g;
+  const matches = [...html.matchAll(re)];
+  if (!matches.length) throw new Error('Could not extract NSUID/hash from store page');
+  const platform = matches[0][1];
+  const nsuid    = matches[0][2];
+  const hashes   = [...new Set(matches.map(m => m[3]))]; // deduplicated, order preserved
+  return { platform, nsuid, hashes };
 }
 
-function buildCdnUrls(platform, nsuid, hash) {
-  const base = 'https://assets.nintendo.com/image/upload';
-  const path = `store/software/${platform}/${nsuid}/${hash}`;
+function buildCdnUrls(platform, nsuid, hashes) {
+  const base     = 'https://assets.nintendo.com/image/upload';
+  const mainPath = `store/software/${platform}/${nsuid}/${hashes[0]}`;
   return {
-    upload:     `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${path}`,
-    display:    `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${path}`,
-    screenshot: `${base}/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_1.5/${path}`
+    upload:        `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
+    coverUrl:      `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,
+    screenshotUrls: hashes.map(h =>
+      `${base}/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_1.5/store/software/${platform}/${nsuid}/${h}`
+    )
   };
 }
 
@@ -117,8 +122,8 @@ export default {
       if (!storePage.ok) throw new Error('Store page fetch failed: ' + storePage.status);
       const html = await storePage.text();
 
-      const { platform, nsuid, hash } = extractNintendoAssets(html);
-      const cdn = buildCdnUrls(platform, nsuid, hash);
+      const { platform, nsuid, hashes } = extractNintendoAssets(html);
+      const cdn = buildCdnUrls(platform, nsuid, hashes);
 
       // ── Step 2: Fetch cover image, template frame, and font in parallel ─
       const [imgRes, frameRes, fontRes] = await Promise.all([
@@ -143,8 +148,8 @@ export default {
       // ── Step 4: Return ─────────────────────────────────────────────────
       return corsResponse({
         thumbnailDataUrl,
-        coverUrl:      cdn.display,
-        screenshotUrl: cdn.screenshot
+        coverUrl:       cdn.coverUrl,
+        screenshotUrls: cdn.screenshotUrls
       });
 
     } catch (err) {

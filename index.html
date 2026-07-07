@@ -1180,12 +1180,12 @@ el('thumbDownloadBtn').addEventListener('click', function() {
   var img = el('thumbPreview');
   if (!img.src) return;
   var canvas = document.createElement('canvas');
-  canvas.width = 1280;
-  canvas.height = 720;
+  canvas.width = 1080;
+  canvas.height = 1080;
   var ctx = canvas.getContext('2d');
   var image = new Image();
   image.onload = function() {
-    ctx.drawImage(image, 0, 0, 1280, 720);
+    ctx.drawImage(image, 0, 0, 1080, 1080);
     var a = document.createElement('a');
     a.download = (el('gameName').value.trim() || 'thumbnail') + '.png';
     a.href = canvas.toDataURL('image/png');

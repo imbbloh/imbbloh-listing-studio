@@ -1,16 +1,19 @@
-// ── Constants ──────────────────────────────────────────────────────────────
-const CANVA_API = 'https://api.canva.com/rest/v1';
+const FRAME_URL = 'https://imbbloh.github.io/imbbloh-listing-studio/assets/ns-template-frame.png';
+const CANVAS_W  = 1080;
+const CANVAS_H  = 1080;
+const COVER_Y   = 0;    // cover art starts at top; frame overlays the header
+const COVER_H   = 940;  // cover art ends before the bottom title bar
+const TITLE_Y   = 1010; // vertical center of title text inside bottom bar
 
-// ── Font size by title character count ───────────────────────────────────
-function fontSize(title) {
+// ── Font size for title text (1080px-wide bottom bar) ─────────────────────
+function titleFontSize(title) {
   const n = title.length;
-  if (n <= 17) return 72;
-  if (n <= 23) return 62;
-  if (n <= 25) return 58;
-  if (n <= 46) return 46;
-  if (n <= 47) return 38;
-  if (n <= 71) return 34;
-  return 28;
+  if (n <= 12) return 80;
+  if (n <= 18) return 70;
+  if (n <= 25) return 62;
+  if (n <= 34) return 52;
+  if (n <= 45) return 42;
+  return 34;
 }
 
 // ── Escape XML special characters ─────────────────────────────────────────
@@ -34,20 +37,19 @@ function toBase64(buffer) {
 }
 
 // ── Build thumbnail SVG ────────────────────────────────────────────────────
-// Layout (1280×720):
-//   0–90  : dark top bar — game title centred
-//  90–632 : cover art (white letterbox + image)
-// 632–720 : red bottom bar — "NINTENDO SWITCH"
-function buildThumbnailSvg(gameTitle, coverBase64) {
-  const fs = fontSize(gameTitle);
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="720" viewBox="0 0 1280 720">
-  <rect width="1280" height="720" fill="#0a0a1a"/>
-  <rect x="40" y="90" width="1200" height="542" fill="white" rx="6"/>
-  <image href="data:image/jpeg;base64,${coverBase64}" x="40" y="90" width="1200" height="542" preserveAspectRatio="xMidYMid meet"/>
-  <rect x="0" y="0" width="1280" height="90" fill="#0a0a1a"/>
-  <text x="640" y="45" fill="white" font-size="${fs}" font-family="Arial,Helvetica,sans-serif" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${escapeXml(gameTitle)}</text>
-  <rect x="0" y="632" width="1280" height="88" fill="#e63946"/>
-  <text x="640" y="676" fill="white" font-size="26" font-family="Arial,Helvetica,sans-serif" font-weight="bold" text-anchor="middle" dominant-baseline="middle" letter-spacing="4">NINTENDO SWITCH</text>
+// Layer order (bottom → top):
+//   [1] Red background (full canvas)
+//   [2] Cover art      (full width, y=0 to COVER_H; frame overlays header)
+//   [3] Template frame (transparent PNG with all static branding)
+//   [4] Title text     (white uppercase bold, centred in bottom bar)
+function buildThumbnailSvg(gameTitle, coverBase64, frameBase64) {
+  const fs    = titleFontSize(gameTitle);
+  const title = escapeXml(gameTitle.toUpperCase());
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+  <rect width="${CANVAS_W}" height="${CANVAS_H}" fill="#e8001d"/>
+  <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="${COVER_Y}" width="${CANVAS_W}" height="${COVER_H}" preserveAspectRatio="xMidYMid slice"/>
+  <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}"/>
+  <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fs}" font-family="'Arial Black',Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle">${title}</text>
 </svg>`;
 }
 
@@ -113,13 +115,21 @@ export default {
       const { platform, nsuid, hash } = extractNintendoAssets(html);
       const cdn = buildCdnUrls(platform, nsuid, hash);
 
-      // ── Step 2: Fetch cover image ──────────────────────────────────────
-      const imgRes = await fetch(cdn.upload);
-      if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);
-      const coverBase64 = toBase64(await imgRes.arrayBuffer());
+      // ── Step 2: Fetch cover image and template frame in parallel ───────
+      const [imgRes, frameRes] = await Promise.all([
+        fetch(cdn.upload),
+        fetch(FRAME_URL)
+      ]);
+      if (!imgRes.ok)   throw new Error('Cover image fetch failed: ' + imgRes.status);
+      if (!frameRes.ok) throw new Error('Template frame fetch failed: ' + frameRes.status);
+
+      const [coverBase64, frameBase64] = await Promise.all([
+        imgRes.arrayBuffer().then(toBase64),
+        frameRes.arrayBuffer().then(toBase64)
+      ]);
 
       // ── Step 3: Build SVG thumbnail ────────────────────────────────────
-      const svg = buildThumbnailSvg(gameTitle, coverBase64);
+      const svg = buildThumbnailSvg(gameTitle, coverBase64, frameBase64);
       const thumbnailDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 
       // ── Step 4: Return ─────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-const FRAME_URL = 'https://imbbloh.github.io/imbbloh-listing-studio/assets/ns-template-frame.png';
+const FRAME_URL = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/ns-template-frame.png';
 const CANVAS_W  = 1080;
 const CANVAS_H  = 1080;
 const COVER_Y   = 295;   // top of black cover window in the frame PNG

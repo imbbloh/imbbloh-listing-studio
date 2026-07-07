@@ -1,5 +1,5 @@
 const FRAME_URL = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/ns-template-frame.png';
-const FONT_URL  = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/gagalin.ttf';
+const FONT_URL  = 'https://raw.githubusercontent.com/imbbloh/imbbloh-listing-studio/claude/test-coverage-analysis-7tkqrn/assets/gagalin.otf';
 const CANVAS_W  = 1080;
 const CANVAS_H  = 1080;
 const COVER_Y   = 295;   // top of transparent window in frame PNG
@@ -48,7 +48,7 @@ function buildThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
   const title = escapeXml(gameTitle.toUpperCase());
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
   <defs>
-    <style>@font-face { font-family: 'Gagalin'; src: url('data:font/truetype;base64,${fontBase64}'); }</style>
+    <style>@font-face { font-family: 'Gagalin'; src: url('data:font/otf;base64,${fontBase64}'); }</style>
   </defs>
   <rect width="${CANVAS_W}" height="${CANVAS_H}" fill="#e8001d"/>
   <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="${COVER_Y}" width="${CANVAS_W}" height="${COVER_H}" preserveAspectRatio="xMidYMid slice"/>

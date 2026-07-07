@@ -120,10 +120,13 @@ export default {
       const cdn = buildCdnUrls(platform, nsuid, hash);
 
       // ── Step 2: Fetch cover image, template frame, and font in parallel ─
+      // Static assets (frame + font) are cached at Cloudflare edge for 24h
+      // to avoid raw.githubusercontent.com rate limits (429).
+      const CACHE_OPTS = { cf: { cacheTtl: 86400, cacheEverything: true } };
       const [imgRes, frameRes, fontRes] = await Promise.all([
         fetch(cdn.upload),
-        fetch(FRAME_URL),
-        fetch(FONT_URL)
+        fetch(FRAME_URL, CACHE_OPTS),
+        fetch(FONT_URL,  CACHE_OPTS)
       ]);
       if (!imgRes.ok)   throw new Error('Cover image fetch failed: ' + imgRes.status);
       if (!frameRes.ok) throw new Error('Template frame fetch failed: ' + frameRes.status);

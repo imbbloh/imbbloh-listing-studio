@@ -2,12 +2,6 @@
 const TEMPLATE_ID    = 'DAHG7ZFb7_k';
 const COVER_ELEMENT  = 'PBBMg0PBzsN5P8bS-LBWwC6v2gppr4vRT';
 const TITLE_ELEMENT  = 'PBBMg0PBzsN5P8bS-LB5xlCmLRvrG2wpc';
-const PAGE_IDS = [
-  'PBBMg0PBzsN5P8bS', 'PB3b7jWPX5ZrtRRj', 'PBVPrhcXTNWRQJvZ',
-  'PBMmY5dhtBfXNqJX', 'PB5zL4Y3x9qxZVMZ', 'PBnr2gNlYZL3VyR7',
-  'PBnLsQrVM08p5Dtp', 'PBFHcbqF6WRh4GZ5', 'PBVSpzD8w2BCTHW8',
-  'PBGc4ddYCY6DLTfl'
-];
 const CANVA_API = 'https://api.canva.com/rest/v1';
 
 // ── Font size by title character count ───────────────────────────────────
@@ -128,9 +122,11 @@ export default {
       let assetId = uploadRes.job?.id
         ?? uploadRes.asset?.id
         ?? (() => { throw new Error('No asset ID in upload response: ' + JSON.stringify(uploadRes)); })();
-      sessionId = txRes.editing_session?.editing_session_id
-        ?? txRes.session?.id
-        ?? (() => { throw new Error('No session ID in tx response: ' + JSON.stringify(txRes)); })();
+      sessionId = txRes.transaction?.transaction_id
+        ?? (() => { throw new Error('No transaction ID in response: ' + JSON.stringify(txRes)); })();
+
+      const pages = txRes.pages;
+      if (!pages?.length) throw new Error('No pages in transaction response: ' + JSON.stringify(txRes));
 
       // Wait for upload to complete if it's async
       if (uploadRes.job?.status === 'in_progress') {
@@ -150,9 +146,8 @@ export default {
       }
 
       // ── Step 3: Bundled edit ──────────────────────────────────────────
-      const pages = PAGE_IDS.map(id => ({ page_id: id, is_responsive: false }));
       await canva('PATCH', `/designs/${TEMPLATE_ID}/editing-sessions/${sessionId}`, {
-        editing_session_id: sessionId,
+        transaction_id: sessionId,
         page_index: 1,
         pages,
         operations: [
@@ -177,7 +172,7 @@ export default {
       }, token);
 
       // ── Step 4: Commit ────────────────────────────────────────────────
-      await canva('POST', `/designs/${TEMPLATE_ID}/editing-sessions/${sessionId}/publish`, {}, token);
+      await canva('POST', `/designs/${TEMPLATE_ID}/editing-sessions/${sessionId}/commit`, {}, token);
       sessionId = null; // committed — no need to cancel on error
 
       // ── Step 5: Export pages 1 and 10 ────────────────────────────────

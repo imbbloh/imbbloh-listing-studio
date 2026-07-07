@@ -1,0 +1,6 @@
+name = "imbbloh-thumbnail-worker"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Set the Canva token as a secret (never commit the actual value):
+#   wrangler secret put CANVA_TOKEN

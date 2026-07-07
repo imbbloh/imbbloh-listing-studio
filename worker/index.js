@@ -113,11 +113,25 @@ export default {
       const { platform, nsuid, hash } = extractNintendoAssets(html);
       const cdn = buildCdnUrls(platform, nsuid, hash);
 
-      // ── Step 2: Parallel — upload cover + start editing transaction ───
-      const [uploadRes, txRes] = await Promise.all([
-        canva('POST', '/asset-uploads', { url: cdn.upload, name: gameTitle }, token),
+      // ── Step 2: Parallel — fetch cover image + start editing transaction ─
+      const [imgFetch, txRes] = await Promise.all([
+        fetch(cdn.upload),
         canva('POST', `/designs/${TEMPLATE_ID}/editing-sessions`, {}, token)
       ]);
+      if (!imgFetch.ok) throw new Error('Cover image fetch failed: ' + imgFetch.status);
+      const imgBuffer = await imgFetch.arrayBuffer();
+
+      // Upload binary to Canva (octet-stream, not JSON)
+      const uploadRaw = await fetch(
+        `${CANVA_API}/asset-uploads?name=${encodeURIComponent(gameTitle)}`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/octet-stream' },
+          body: imgBuffer
+        }
+      );
+      const uploadRes = await uploadRaw.json();
+      if (!uploadRaw.ok) throw new Error('Canva /asset-uploads → ' + JSON.stringify(uploadRes));
 
       let assetId = uploadRes.job?.id
         ?? uploadRes.asset?.id

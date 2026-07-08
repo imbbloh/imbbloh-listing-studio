@@ -85,6 +85,9 @@ app.use((req, res, next) => {
 
 app.options('*', (req, res) => res.sendStatus(204));
 
+// ── Health check (used by UptimeRobot keep-alive ping) ────────────────────
+app.get('/health', (req, res) => res.json({ ok: true }));
+
 // ── Serve frontend ─────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));

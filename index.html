@@ -1185,56 +1185,68 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
 
   var gameName = (el('gameName').value.trim() || 'game').replace(/[/\\?%*:|"<>]/g, '-');
 
-  // Helper: trigger a download via the server proxy
-  function proxyDownload(imageUrl, filename) {
+  // Save a blob to disk under the given filename (instant, no network wait)
+  function saveBlobAs(blob, filename) {
+    var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = THUMB_WORKER + '/download?url=' + encodeURIComponent(imageUrl) + '&filename=' + encodeURIComponent(filename);
+    a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
   }
 
-  // 1. Thumbnail PNG via canvas
-  var img = el('thumbPreview');
-  if (img.src) {
-    var canvas = document.createElement('canvas');
-    canvas.width = 1080; canvas.height = 1080;
-    var ctx = canvas.getContext('2d');
-    var image = new Image();
-    await new Promise(function(resolve) {
-      image.onload = resolve;
-      image.src = img.src;
-    });
-    ctx.drawImage(image, 0, 0, 1080, 1080);
-    var a = document.createElement('a');
-    a.download = gameName + '1.png';
-    a.href = canvas.toDataURL('image/png');
-    a.click();
+  // Fully fetch a URL via the server proxy, then save — awaits the complete
+  // response so the next download never starts before this one is received.
+  async function fetchAndSave(proxyUrl, baseFilename) {
+    var res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error('Download failed: ' + res.status);
+    var blob = await res.blob();
+    var ext = blob.type.includes('png') ? '.png' : blob.type.includes('webp') ? '.webp' : '.jpg';
+    saveBlobAs(blob, baseFilename + ext);
   }
 
-  await new Promise(function(r) { setTimeout(r, 600); });
+  try {
+    // 1. Thumbnail — render canvas to blob (synchronous, no network)
+    var img = el('thumbPreview');
+    if (img.src) {
+      var canvas = document.createElement('canvas');
+      canvas.width = 1080; canvas.height = 1080;
+      var ctx = canvas.getContext('2d');
+      var image = new Image();
+      await new Promise(function(resolve) { image.onload = resolve; image.src = img.src; });
+      ctx.drawImage(image, 0, 0, 1080, 1080);
+      var blob1 = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
+      saveBlobAs(blob1, gameName + '1.png');
+    }
 
-  // 2. NS promo slide — served from server disk, no CDN involved
-  (function() {
-    var a = document.createElement('a');
-    a.href = THUMB_WORKER + '/promo-slide?filename=' + encodeURIComponent(gameName + '2');
-    a.download = gameName + '2.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  })();
+    await new Promise(function(r) { setTimeout(r, 800); });
 
-  // 3. Screenshots from index 1+ (skip screenshot 1 which duplicates cover)
-  var shots = (curImageUrls.screenshotUrls || []).slice(1);
-  for (var i = 0; i < shots.length; i++) {
-    await new Promise(function(r) { setTimeout(r, 600); });
-    proxyDownload(shots[i], gameName + (i + 3));
+    // 2. NS promo slide — served from server memory, instant response
+    await fetchAndSave(
+      THUMB_WORKER + '/promo-slide',
+      gameName + '2'
+    );
+
+    // 3+ Screenshots (skip index 0 which duplicates the cover)
+    var shots = (curImageUrls.screenshotUrls || []).slice(1);
+    for (var i = 0; i < shots.length; i++) {
+      await new Promise(function(r) { setTimeout(r, 800); });
+      await fetchAndSave(
+        THUMB_WORKER + '/download?url=' + encodeURIComponent(shots[i]),
+        gameName + (i + 3)
+      );
+    }
+
+    btn.disabled = false;
+    btn.textContent = '⬇ Download All Images';
+    showToast('All images downloaded!');
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '⬇ Download All Images';
+    showToast(e.message || 'Download failed', true);
   }
-
-  btn.disabled = false;
-  btn.textContent = '⬇ Download All Images';
-  showToast('All images downloaded!');
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────

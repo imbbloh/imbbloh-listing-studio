@@ -1206,46 +1206,44 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
   }
 
-  // Fully fetch a URL via the server proxy, then save — awaits the complete
-  // response so the next download never starts before this one is received.
-  async function fetchAndSave(proxyUrl, baseFilename) {
-    var res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error('Download failed: ' + res.status);
-    var blob = await res.blob();
-    var ext = blob.type.includes('png') ? '.png' : blob.type.includes('webp') ? '.webp' : '.jpg';
-    saveBlobAs(blob, baseFilename + ext);
-  }
-
   try {
-    // 1. Thumbnail — render canvas to blob (synchronous, no network)
-    var img = el('thumbPreview');
-    if (img.src) {
-      var canvas = document.createElement('canvas');
-      canvas.width = 1080; canvas.height = 1080;
-      var ctx = canvas.getContext('2d');
-      var image = new Image();
-      await new Promise(function(resolve) { image.onload = resolve; image.src = img.src; });
-      ctx.drawImage(image, 0, 0, 1080, 1080);
-      var blob1 = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
-      saveBlobAs(blob1, gameName + '1.png');
-    }
+    var shots = (curImageUrls.screenshotUrls || []).slice(1);
 
-    await new Promise(function(r) { setTimeout(r, 800); });
+    // Render thumbnail to blob
+    var canvas = document.createElement('canvas');
+    canvas.width = 1080; canvas.height = 1080;
+    var ctx = canvas.getContext('2d');
+    var image = new Image();
+    await new Promise(function(resolve) { image.onload = resolve; image.src = el('thumbPreview').src; });
+    ctx.drawImage(image, 0, 0, 1080, 1080);
+    var thumbBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
 
-    // 2. NS promo slide — served from server memory, instant response
-    await fetchAndSave(
-      THUMB_WORKER + '/promo-slide',
-      gameName + '2'
+    // Fetch all remote files in parallel — network work happens concurrently
+    var remoteBlobs = await Promise.all(
+      [THUMB_WORKER + '/promo-slide'].concat(
+        shots.map(function(u) { return THUMB_WORKER + '/download?url=' + encodeURIComponent(u); })
+      ).map(function(url) {
+        return fetch(url).then(function(r) {
+          if (!r.ok) throw new Error('Fetch failed: ' + r.status);
+          return r.blob();
+        });
+      })
     );
 
-    // 3+ Screenshots (skip index 0 which duplicates the cover)
-    var shots = (curImageUrls.screenshotUrls || []).slice(1);
+    // Save sequentially with a small gap so the browser queues them in order
+    var delay = function() { return new Promise(function(r) { setTimeout(r, 300); }); };
+
+    saveBlobAs(thumbBlob, gameName + '1.png');
+    await delay();
+
+    var promoBlob = remoteBlobs[0];
+    saveBlobAs(promoBlob, gameName + '2.png');
+
     for (var i = 0; i < shots.length; i++) {
-      await new Promise(function(r) { setTimeout(r, 800); });
-      await fetchAndSave(
-        THUMB_WORKER + '/download?url=' + encodeURIComponent(shots[i]),
-        gameName + (i + 3)
-      );
+      await delay();
+      var b = remoteBlobs[i + 1];
+      var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
+      saveBlobAs(b, gameName + (i + 3) + ext);
     }
 
     btn.disabled = false;

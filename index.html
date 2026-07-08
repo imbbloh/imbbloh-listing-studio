@@ -1161,11 +1161,13 @@ el('thumbBtn').addEventListener('click', async function() {
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
 
-    // File 1 = thumbnail, File 2 = promo; screenshots start at File 3
-    var links = '';
+    // Build copy links: File 1 (thumbnail), File 2 (promo), then screenshots
+    var links =
+      'Thumbnail (File 1):\n' + data.coverUrl +
+      '\n\nPromo (File 2):\n' + THUMB_WORKER + '/promo-slide';
     if (data.screenshotUrls && data.screenshotUrls.length > 1) {
       data.screenshotUrls.slice(1).forEach(function(url, i) {
-        links += (links ? '\n\n' : '') + 'Screenshot ' + (i + 1) + ' (File ' + (i + 3) + '):\n' + url;
+        links += '\n\nScreenshot ' + (i + 1) + ' (File ' + (i + 3) + '):\n' + url;
       });
     }
     el('thumbLinks').textContent = links;

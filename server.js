@@ -1,8 +1,12 @@
 const express = require('express');
+const fs      = require('fs');
+const path    = require('path');
 
-// Pinned to commit SHA so jsDelivr caches permanently
-const FRAME_URL = 'https://cdn.jsdelivr.net/gh/imbbloh/imbbloh-listing-studio@54b9ae1/assets/ns-template-frame.png';
-const FONT_URL  = 'https://cdn.jsdelivr.net/gh/imbbloh/imbbloh-listing-studio@54b9ae1/assets/gagalin.otf';
+// Load static assets from disk once at startup — no CDN fetches, no 429 risk
+const FRAME_BASE64 = fs.readFileSync(path.join(__dirname, 'assets/ns-template-frame.png')).toString('base64');
+const FONT_BASE64  = fs.readFileSync(path.join(__dirname, 'assets/gagalin.otf')).toString('base64');
+const PROMO_PNG    = fs.readFileSync(path.join(__dirname, 'assets/ns-promo-slide.png'));
+
 const CANVAS_W  = 1080;
 const CANVAS_H  = 1080;
 const COVER_Y   = 295;
@@ -32,8 +36,8 @@ function toBase64(buffer) {
 }
 
 function buildThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
-  const fs    = titleFontSize(gameTitle);
-  const title = escapeXml(gameTitle.toUpperCase());
+  const fontSize = titleFontSize(gameTitle);
+  const title    = escapeXml(gameTitle.toUpperCase());
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
   <defs>
     <style>@font-face { font-family: 'Gagalin'; src: url('data:font/otf;base64,${fontBase64}'); }</style>
@@ -41,7 +45,7 @@ function buildThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
   <rect width="${CANVAS_W}" height="${CANVAS_H}" fill="#e8001d"/>
   <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="${COVER_Y}" width="${CANVAS_W}" height="${COVER_H}" preserveAspectRatio="xMidYMid slice"/>
   <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}"/>
-  <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fs}" font-family="Gagalin,Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle" letter-spacing="3">${title}</text>
+  <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fontSize}" font-family="Gagalin,Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle" letter-spacing="3">${title}</text>
 </svg>`;
 }
 
@@ -81,6 +85,16 @@ app.use((req, res, next) => {
 
 app.options('*', (req, res) => res.sendStatus(204));
 
+// ── Promo slide endpoint ───────────────────────────────────────────────────
+// Serves ns-promo-slide.png from memory (loaded at startup) so the frontend
+// can download it via the same /download flow without hitting any CDN.
+app.get('/promo-slide', (req, res) => {
+  const filename = req.query.filename ? decodeURIComponent(req.query.filename) + '.png' : 'ns-promo-slide.png';
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(PROMO_PNG);
+});
+
 // ── Image download proxy ───────────────────────────────────────────────────
 // Fetches a Nintendo CDN image server-side and streams it back as an
 // attachment, bypassing the browser's cross-origin download restriction.
@@ -118,22 +132,11 @@ app.post('/', async (req, res) => {
     const { platform, nsuid, hashes } = extractNintendoAssets(html);
     const cdn = buildCdnUrls(platform, nsuid, hashes);
 
-    const [imgRes, frameRes, fontRes] = await Promise.all([
-      fetch(cdn.upload),
-      fetch(FRAME_URL),
-      fetch(FONT_URL)
-    ]);
-    if (!imgRes.ok)   throw new Error('Cover image fetch failed: ' + imgRes.status);
-    if (!frameRes.ok) throw new Error('Template frame fetch failed: ' + frameRes.status);
-    if (!fontRes.ok)  throw new Error('Font fetch failed: ' + fontRes.status);
+    const imgRes = await fetch(cdn.upload);
+    if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);
 
-    const [coverBase64, frameBase64, fontBase64] = await Promise.all([
-      imgRes.arrayBuffer().then(toBase64),
-      frameRes.arrayBuffer().then(toBase64),
-      fontRes.arrayBuffer().then(toBase64)
-    ]);
-
-    const svg = buildThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64);
+    const coverBase64 = toBase64(await imgRes.arrayBuffer());
+    const svg = buildThumbnailSvg(gameTitle, coverBase64, FRAME_BASE64, FONT_BASE64);
     const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
 
     res.json({

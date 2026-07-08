@@ -1,0 +1,15 @@
+{
+  "name": "imbbloh-listing-studio",
+  "version": "1.0.0",
+  "description": "Thumbnail generation server for Nintendo Switch listings",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

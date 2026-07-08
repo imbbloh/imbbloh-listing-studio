@@ -81,6 +81,26 @@ app.use((req, res, next) => {
 
 app.options('*', (req, res) => res.sendStatus(204));
 
+// ── Image download proxy ───────────────────────────────────────────────────
+// Fetches a Nintendo CDN image server-side and streams it back as an
+// attachment, bypassing the browser's cross-origin download restriction.
+app.get('/download', async (req, res) => {
+  const { url, filename } = req.query;
+  if (!url) return res.status(400).json({ error: 'Missing url' });
+  try {
+    const imgRes = await fetch(decodeURIComponent(url));
+    if (!imgRes.ok) throw new Error('Image fetch failed: ' + imgRes.status);
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+    const ext  = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+    const name = filename ? decodeURIComponent(filename) + '.' + ext : 'image.' + ext;
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+    res.send(Buffer.from(await imgRes.arrayBuffer()));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/', async (req, res) => {
   const { storeUrl, gameTitle } = req.body || {};
   if (!storeUrl || !gameTitle) {

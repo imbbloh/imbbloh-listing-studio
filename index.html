@@ -524,7 +524,6 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <div class="card-title">🖼️ Thumbnail</div>
     <img id="thumbPreview" style="width:100%;border-radius:6px;margin-bottom:12px" alt="Thumbnail preview"/>
     <div style="margin-bottom:12px">
-      <button class="btn-thumb" id="thumbDownloadBtn" style="margin-right:8px">⬇ Download PNG</button>
       <button class="btn-thumb" id="thumbDownloadAllBtn">⬇ Download All Images</button>
     </div>
     <div class="card-title" style="margin-top:4px">📋 Copy Links</div>
@@ -1162,11 +1161,11 @@ el('thumbBtn').addEventListener('click', async function() {
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
 
+    // Skip cover (screenshotUrls[0] is same image) and screenshot 1; show from index 1
     var links = '';
-    if (data.coverUrl) links += 'Cover:\n' + data.coverUrl;
-    if (data.screenshotUrls && data.screenshotUrls.length) {
-      data.screenshotUrls.forEach(function(url, i) {
-        links += '\n\nScreenshot ' + (i + 1) + ':\n' + url;
+    if (data.screenshotUrls && data.screenshotUrls.length > 1) {
+      data.screenshotUrls.slice(1).forEach(function(url, i) {
+        links += (links ? '\n\n' : '') + 'Screenshot ' + (i + 1) + ':\n' + url;
       });
     }
     el('thumbLinks').textContent = links;
@@ -1185,26 +1184,10 @@ el('thumbBtn').addEventListener('click', async function() {
   }
 });
 
-// ── Thumbnail PNG download ─────────────────────────────────────────────────
-el('thumbDownloadBtn').addEventListener('click', function() {
-  var img = el('thumbPreview');
-  if (!img.src) return;
-  var canvas = document.createElement('canvas');
-  canvas.width = 1080;
-  canvas.height = 1080;
-  var ctx = canvas.getContext('2d');
-  var image = new Image();
-  image.onload = function() {
-    ctx.drawImage(image, 0, 0, 1080, 1080);
-    var a = document.createElement('a');
-    a.download = (el('gameName').value.trim() || 'thumbnail') + '.png';
-    a.href = canvas.toDataURL('image/png');
-    a.click();
-  };
-  image.src = img.src;
-});
-
 // ── Download All Images ────────────────────────────────────────────────────
+// NS promo slide (Canva page 11) — committed to assets/ns-promo-slide.png
+var NS_PROMO_URL = 'https://cdn.jsdelivr.net/gh/imbbloh/imbbloh-listing-studio@NS_PROMO_SHA/assets/ns-promo-slide.png';
+
 el('thumbDownloadAllBtn').addEventListener('click', async function() {
   if (!curImageUrls) return;
   var btn = this;
@@ -1241,16 +1224,16 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     a.click();
   }
 
-  // 2. Cover + screenshots via proxy, staggered 600ms apart
-  var urls = [];
-  if (curImageUrls.coverUrl) urls.push({ url: curImageUrls.coverUrl, name: gameName + '-cover' });
-  (curImageUrls.screenshotUrls || []).forEach(function(u, i) {
-    urls.push({ url: u, name: gameName + '-screenshot-' + (i + 1) });
-  });
+  await new Promise(function(r) { setTimeout(r, 600); });
 
-  for (var i = 0; i < urls.length; i++) {
+  // 2. NS promo slide (fixed second image)
+  if (NS_PROMO_URL) proxyDownload(NS_PROMO_URL, gameName + '-promo');
+
+  // 3. Screenshots from index 1+ (skip screenshot 1 which duplicates cover)
+  var shots = (curImageUrls.screenshotUrls || []).slice(1);
+  for (var i = 0; i < shots.length; i++) {
     await new Promise(function(r) { setTimeout(r, 600); });
-    proxyDownload(urls[i].url, urls[i].name);
+    proxyDownload(shots[i], gameName + '-screenshot-' + (i + 1));
   }
 
   btn.disabled = false;

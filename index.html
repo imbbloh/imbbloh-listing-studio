@@ -1210,21 +1210,21 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     });
     ctx.drawImage(image, 0, 0, 1080, 1080);
     var a = document.createElement('a');
-    a.download = gameName + '-thumbnail.png';
+    a.download = gameName + '1.png';
     a.href = canvas.toDataURL('image/png');
     a.click();
   }
 
   await new Promise(function(r) { setTimeout(r, 600); });
 
-  // 2. NS promo slide (fixed second image)
-  if (NS_PROMO_URL) proxyDownload(NS_PROMO_URL, gameName + '-promo');
+  // 2. NS promo slide
+  if (NS_PROMO_URL) proxyDownload(NS_PROMO_URL, gameName + '2');
 
   // 3. Screenshots from index 1+ (skip screenshot 1 which duplicates cover)
   var shots = (curImageUrls.screenshotUrls || []).slice(1);
   for (var i = 0; i < shots.length; i++) {
     await new Promise(function(r) { setTimeout(r, 600); });
-    proxyDownload(shots[i], gameName + '-screenshot-' + (i + 1));
+    proxyDownload(shots[i], gameName + (i + 3));
   }
 
   btn.disabled = false;

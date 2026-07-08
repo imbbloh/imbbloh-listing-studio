@@ -525,6 +525,7 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <img id="thumbPreview" style="width:100%;border-radius:6px;margin-bottom:12px" alt="Thumbnail preview"/>
     <div style="margin-bottom:12px">
       <button class="btn-thumb" id="thumbDownloadBtn" style="margin-right:8px">⬇ Download PNG</button>
+      <button class="btn-thumb" id="thumbDownloadAllBtn">⬇ Download All Images</button>
     </div>
     <div class="card-title" style="margin-top:4px">📋 Copy Links</div>
     <pre class="thumb-links" id="thumbLinks"></pre>
@@ -566,7 +567,8 @@ var CF = {
 var appMode   = 'game';   // 'game' | 'code'
 var platSel   = null;     // 'ns12' | 'ns2' | 'ps45' | 'ps5'
 var codeSub   = 'full';   // 'full' | 'dlc' | 'upgrade'
-var curCopy   = '';
+var curCopy      = '';
+var curImageUrls = null; // { coverUrl, screenshotUrls } from last generation
 var curFilt   = 'all';
 var saved     = JSON.parse(localStorage.getItem('ibl') || '[]');
 
@@ -608,6 +610,7 @@ function setMode(m) {
 
   // Reset output
   curCopy = '';
+  curImageUrls = null;
   el('outputCard').classList.remove('visible');
   el('storeUrl').value = '';
   el('storeUrl').style.color = '';
@@ -985,6 +988,7 @@ function doSave() {
       el('storeUrl').style.color = '';
       if (platSel) { el('p-' + platSel).classList.remove('sel'); platSel = null; }
       curCopy = '';
+      curImageUrls = null;
       el('outputCard').classList.remove('visible');
       el('thumbCard').style.display = 'none';
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1147,6 +1151,8 @@ el('thumbBtn').addEventListener('click', async function() {
     var thumbImg = el('thumbPreview');
     thumbImg.src = data.thumbnailDataUrl;
 
+    curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
+
     var links = '';
     if (data.coverUrl) links += 'Cover:\n' + data.coverUrl;
     if (data.screenshotUrls && data.screenshotUrls.length) {
@@ -1187,6 +1193,60 @@ el('thumbDownloadBtn').addEventListener('click', function() {
     a.click();
   };
   image.src = img.src;
+});
+
+// ── Download All Images ────────────────────────────────────────────────────
+el('thumbDownloadAllBtn').addEventListener('click', async function() {
+  if (!curImageUrls) return;
+  var btn = this;
+  btn.disabled = true;
+  btn.textContent = '⏳ Downloading…';
+
+  var gameName = (el('gameName').value.trim() || 'game').replace(/[/\\?%*:|"<>]/g, '-');
+
+  // Helper: trigger a download via the server proxy
+  function proxyDownload(imageUrl, filename) {
+    var a = document.createElement('a');
+    a.href = THUMB_WORKER + '/download?url=' + encodeURIComponent(imageUrl) + '&filename=' + encodeURIComponent(filename);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  // 1. Thumbnail PNG via canvas
+  var img = el('thumbPreview');
+  if (img.src) {
+    var canvas = document.createElement('canvas');
+    canvas.width = 1080; canvas.height = 1080;
+    var ctx = canvas.getContext('2d');
+    var image = new Image();
+    await new Promise(function(resolve) {
+      image.onload = resolve;
+      image.src = img.src;
+    });
+    ctx.drawImage(image, 0, 0, 1080, 1080);
+    var a = document.createElement('a');
+    a.download = gameName + '-thumbnail.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  }
+
+  // 2. Cover + screenshots via proxy, staggered 600ms apart
+  var urls = [];
+  if (curImageUrls.coverUrl) urls.push({ url: curImageUrls.coverUrl, name: gameName + '-cover' });
+  (curImageUrls.screenshotUrls || []).forEach(function(u, i) {
+    urls.push({ url: u, name: gameName + '-screenshot-' + (i + 1) });
+  });
+
+  for (var i = 0; i < urls.length; i++) {
+    await new Promise(function(r) { setTimeout(r, 600); });
+    proxyDownload(urls[i].url, urls[i].name);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '⬇ Download All Images';
+  showToast('All images downloaded!');
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────

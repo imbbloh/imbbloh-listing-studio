@@ -523,6 +523,10 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
   <div class="card" id="thumbCard" style="display:none">
     <div class="card-title">🖼️ Thumbnail</div>
     <img id="thumbPreview" style="width:100%;border-radius:6px;margin-bottom:12px" alt="Thumbnail preview"/>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Edit Title</label>
+      <input type="text" id="thumbTitle" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
     <div style="margin-bottom:12px">
       <button class="btn-thumb" id="thumbDownloadAllBtn">⬇ Download All Images</button>
     </div>
@@ -568,6 +572,7 @@ var platSel   = null;     // 'ns12' | 'ns2' | 'ps45' | 'ps5'
 var codeSub   = 'full';   // 'full' | 'dlc' | 'upgrade'
 var curCopy      = '';
 var curImageUrls = null; // { coverUrl, screenshotUrls } from last generation
+var curSvg       = null; // decoded SVG string for client-side title editing
 var curFilt   = 'all';
 var saved     = JSON.parse(localStorage.getItem('ibl') || '[]');
 
@@ -1131,6 +1136,37 @@ el('listBox').addEventListener('click', function(e) {
   }
 });
 
+// ── Thumbnail title editor ─────────────────────────────────────────────────
+function thumbTitleFontSize(n) {
+  if (n <= 12) return 80;
+  if (n <= 18) return 70;
+  if (n <= 25) return 62;
+  if (n <= 34) return 52;
+  if (n <= 45) return 42;
+  return 34;
+}
+
+function thumbEscapeXml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function applyThumbTitle(title) {
+  if (!curSvg) return;
+  var fs      = thumbTitleFontSize(title.length);
+  var escaped = thumbEscapeXml(title.toUpperCase());
+  var updated = curSvg
+    .replace(/font-size="\d+"/, 'font-size="' + fs + '"')
+    .replace(/(<text[^>]*>)[^<]*(<\/text>)/, '$1' + escaped + '$2');
+  // UTF-8-safe base64 encode
+  var b64 = btoa(unescape(encodeURIComponent(updated)));
+  el('thumbPreview').src = 'data:image/svg+xml;base64,' + b64;
+  curSvg = updated;
+}
+
+el('thumbTitle').addEventListener('input', function() {
+  applyThumbTitle(this.value);
+});
+
 // ── Thumbnail generation ───────────────────────────────────────────────────
 var THUMB_WORKER = 'https://imbbloh-listing-studio.onrender.com';
 
@@ -1158,6 +1194,13 @@ el('thumbBtn').addEventListener('click', async function() {
 
     var thumbImg = el('thumbPreview');
     thumbImg.src = data.thumbnailDataUrl;
+
+    // Decode SVG for client-side title editing
+    var svgBytes = atob(data.thumbnailDataUrl.split(',')[1]);
+    var svgArr = new Uint8Array(svgBytes.length);
+    for (var j = 0; j < svgBytes.length; j++) svgArr[j] = svgBytes.charCodeAt(j);
+    curSvg = new TextDecoder('utf-8').decode(svgArr);
+    el('thumbTitle').value = gameTitle;
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
 

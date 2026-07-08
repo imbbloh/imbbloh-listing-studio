@@ -1245,16 +1245,14 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   btn.textContent = '⏳ Downloading…';
 
   var gameName = (el('gameName').value.trim() || 'game').replace(/[/\\?%*:|"<>]/g, '-');
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-  // Save a blob to disk under the given filename (instant, no network wait)
+  // Desktop: save blob as a named file download
   function saveBlobAs(blob, filename) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
   }
 
@@ -1270,7 +1268,7 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     ctx.drawImage(image, 0, 0, 1080, 1080);
     var thumbBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
 
-    // Fetch all remote files in parallel — network work happens concurrently
+    // Fetch all remote files in parallel
     var remoteBlobs = await Promise.all(
       [THUMB_WORKER + '/promo-slide'].concat(
         shots.map(function(u) { return THUMB_WORKER + '/download?url=' + encodeURIComponent(u); })
@@ -1282,21 +1280,51 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
       })
     );
 
-    // Save in reverse order so the last file triggered ({game}1) lands newest
-    // in the downloads folder — making it easy to select files in upload order.
-    var delay = function() { return new Promise(function(r) { setTimeout(r, 300); }); };
+    var promoBlob = remoteBlobs[0];
+    var shotBlobs = remoteBlobs.slice(1);
 
-    for (var i = shots.length - 1; i >= 0; i--) {
-      var b = remoteBlobs[i + 1];
-      var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
-      saveBlobAs(b, gameName + (i + 3) + ext);
+    if (isIOS) {
+      // iOS Safari ignores <a download> — use Web Share API instead.
+      // Opens the native share sheet; user taps "Save Image" to save to Photos.
+      var allFiles = [
+        new File([thumbBlob], gameName + '1.png', { type: 'image/png' }),
+        new File([promoBlob], gameName + '2.png', { type: 'image/png' })
+      ].concat(shotBlobs.map(function(b, i) {
+        var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
+        return new File([b], gameName + (i + 3) + ext, { type: b.type });
+      }));
+
+      var shared = false;
+      try {
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: allFiles })) {
+          await navigator.share({ files: allFiles, title: gameName });
+          shared = true;
+        }
+      } catch (shareErr) {
+        if (shareErr.name !== 'AbortError') throw shareErr;
+        // User cancelled the share sheet — treat as success
+        shared = true;
+      }
+
+      if (!shared) {
+        // Fallback: open each image in a new tab for long-press saving
+        allFiles.forEach(function(f) { window.open(URL.createObjectURL(f), '_blank'); });
+        showToast('Hold each image to save to Photos');
+      }
+
+    } else {
+      // Desktop: save in reverse order so {game}1 lands newest in Downloads
+      var delay = function() { return new Promise(function(r) { setTimeout(r, 300); }); };
+      for (var i = shotBlobs.length - 1; i >= 0; i--) {
+        var b = shotBlobs[i];
+        var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
+        saveBlobAs(b, gameName + (i + 3) + ext);
+        await delay();
+      }
+      saveBlobAs(promoBlob, gameName + '2.png');
       await delay();
+      saveBlobAs(thumbBlob, gameName + '1.png');
     }
-
-    saveBlobAs(remoteBlobs[0], gameName + '2.png');
-    await delay();
-
-    saveBlobAs(thumbBlob, gameName + '1.png');
 
     btn.disabled = false;
     btn.textContent = '⬇ Download All Images';

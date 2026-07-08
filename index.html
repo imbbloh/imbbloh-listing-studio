@@ -1136,6 +1136,59 @@ el('listBox').addEventListener('click', function(e) {
   }
 });
 
+// ── iOS thumbnail renderer ─────────────────────────────────────────────────
+// iOS Safari taints the canvas when drawing an SVG that contains embedded
+// images, so toBlob() fails. Instead we redraw each layer individually using
+// blob URLs fetched from the same origin — no taint, clean PNG output.
+var gagalinFontPromise = null;
+
+function loadGagalinFont() {
+  if (!gagalinFontPromise) {
+    gagalinFontPromise = new FontFace('Gagalin', 'url(' + THUMB_WORKER + '/font)')
+      .load().then(function(f) { document.fonts.add(f); });
+  }
+  return gagalinFontPromise;
+}
+
+async function renderThumbForIOS() {
+  var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
+
+  var [coverBlob, frameBlob] = await Promise.all([
+    fetch(THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl)).then(function(r) { return r.blob(); }),
+    fetch(THUMB_WORKER + '/frame').then(function(r) { return r.blob(); })
+  ]);
+  await loadGagalinFont();
+
+  var canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1080;
+  var ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#e8001d';
+  ctx.fillRect(0, 0, 1080, 1080);
+
+  var coverImg = new Image();
+  var coverObjUrl = URL.createObjectURL(coverBlob);
+  await new Promise(function(r) { coverImg.onload = r; coverImg.src = coverObjUrl; });
+  ctx.drawImage(coverImg, 0, 295, 1080, 640);
+  URL.revokeObjectURL(coverObjUrl);
+
+  var frameImg = new Image();
+  var frameObjUrl = URL.createObjectURL(frameBlob);
+  await new Promise(function(r) { frameImg.onload = r; frameImg.src = frameObjUrl; });
+  ctx.drawImage(frameImg, 0, 0, 1080, 1080);
+  URL.revokeObjectURL(frameObjUrl);
+
+  var fontSize = thumbTitleFontSize(title.length);
+  ctx.fillStyle = 'white';
+  ctx.font = '900 ' + fontSize + 'px Gagalin, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+  ctx.fillText(title, 540, 1008);
+
+  return new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
+}
+
 // ── Thumbnail title editor ─────────────────────────────────────────────────
 function thumbTitleFontSize(n) {
   if (n <= 12) return 80;
@@ -1260,13 +1313,20 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     var shots = (curImageUrls.screenshotUrls || []).slice(1);
 
     // Render thumbnail to blob
-    var canvas = document.createElement('canvas');
-    canvas.width = 1080; canvas.height = 1080;
-    var ctx = canvas.getContext('2d');
-    var image = new Image();
-    await new Promise(function(resolve) { image.onload = resolve; image.src = el('thumbPreview').src; });
-    ctx.drawImage(image, 0, 0, 1080, 1080);
-    var thumbBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
+    var thumbBlob;
+    if (isIOS) {
+      // iOS Safari taints canvas when drawing SVG with embedded base64 images —
+      // renderThumbForIOS() draws each layer separately from same-origin blob URLs.
+      thumbBlob = await renderThumbForIOS();
+    } else {
+      var canvas = document.createElement('canvas');
+      canvas.width = 1080; canvas.height = 1080;
+      var ctx = canvas.getContext('2d');
+      var image = new Image();
+      await new Promise(function(resolve) { image.onload = resolve; image.src = el('thumbPreview').src; });
+      ctx.drawImage(image, 0, 0, 1080, 1080);
+      thumbBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
+    }
 
     // Fetch all remote files in parallel
     var remoteBlobs = await Promise.all(

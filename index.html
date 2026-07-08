@@ -1221,21 +1221,21 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
       })
     );
 
-    // Save sequentially with a small gap so the browser queues them in order
+    // Save in reverse order so the last file triggered ({game}1) lands newest
+    // in the downloads folder — making it easy to select files in upload order.
     var delay = function() { return new Promise(function(r) { setTimeout(r, 300); }); };
 
-    saveBlobAs(thumbBlob, gameName + '1.png');
-    await delay();
-
-    var promoBlob = remoteBlobs[0];
-    saveBlobAs(promoBlob, gameName + '2.png');
-
-    for (var i = 0; i < shots.length; i++) {
-      await delay();
+    for (var i = shots.length - 1; i >= 0; i--) {
       var b = remoteBlobs[i + 1];
       var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
       saveBlobAs(b, gameName + (i + 3) + ext);
+      await delay();
     }
+
+    saveBlobAs(remoteBlobs[0], gameName + '2.png');
+    await delay();
+
+    saveBlobAs(thumbBlob, gameName + '1.png');
 
     btn.disabled = false;
     btn.textContent = '⬇ Download All Images';

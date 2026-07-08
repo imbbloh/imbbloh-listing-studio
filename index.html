@@ -1150,15 +1150,7 @@ function loadGagalinFont() {
   return gagalinFontPromise;
 }
 
-async function renderThumbForIOS() {
-  var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
-
-  var [coverBlob, frameBlob] = await Promise.all([
-    fetch(THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl)).then(function(r) { return r.blob(); }),
-    fetch(THUMB_WORKER + '/frame').then(function(r) { return r.blob(); })
-  ]);
-  await loadGagalinFont();
-
+async function renderCanvasToBlob(title, coverBlob, frameBlob) {
   var canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1080;
   var ctx = canvas.getContext('2d');
@@ -1168,13 +1160,21 @@ async function renderThumbForIOS() {
 
   var coverImg = new Image();
   var coverObjUrl = URL.createObjectURL(coverBlob);
-  await new Promise(function(r) { coverImg.onload = r; coverImg.src = coverObjUrl; });
+  await new Promise(function(resolve, reject) {
+    coverImg.onload = resolve;
+    coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
+    coverImg.src = coverObjUrl;
+  });
   ctx.drawImage(coverImg, 0, 295, 1080, 640);
   URL.revokeObjectURL(coverObjUrl);
 
   var frameImg = new Image();
   var frameObjUrl = URL.createObjectURL(frameBlob);
-  await new Promise(function(r) { frameImg.onload = r; frameImg.src = frameObjUrl; });
+  await new Promise(function(resolve, reject) {
+    frameImg.onload = resolve;
+    frameImg.onerror = function() { reject(new Error('Frame image failed to load')); };
+    frameImg.src = frameObjUrl;
+  });
   ctx.drawImage(frameImg, 0, 0, 1080, 1080);
   URL.revokeObjectURL(frameObjUrl);
 
@@ -1186,7 +1186,12 @@ async function renderThumbForIOS() {
   if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
   ctx.fillText(title, 540, 1008);
 
-  return new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
+  return new Promise(function(resolve, reject) {
+    canvas.toBlob(function(blob) {
+      if (blob) resolve(blob);
+      else reject(new Error('Canvas toBlob returned null'));
+    }, 'image/png');
+  });
 }
 
 // ── Thumbnail title editor ─────────────────────────────────────────────────
@@ -1312,40 +1317,35 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   try {
     var shots = (curImageUrls.screenshotUrls || []).slice(1);
 
-    // Render thumbnail to blob
-    var thumbBlob;
     if (isIOS) {
-      // iOS Safari taints canvas when drawing SVG with embedded base64 images —
-      // renderThumbForIOS() draws each layer separately from same-origin blob URLs.
-      thumbBlob = await renderThumbForIOS();
-    } else {
-      var canvas = document.createElement('canvas');
-      canvas.width = 1080; canvas.height = 1080;
-      var ctx = canvas.getContext('2d');
-      var image = new Image();
-      await new Promise(function(resolve) { image.onload = resolve; image.src = el('thumbPreview').src; });
-      ctx.drawImage(image, 0, 0, 1080, 1080);
-      thumbBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
-    }
+      // iOS: fetch cover, frame, promo, and all screenshots in one parallel batch,
+      // then render the canvas, then share — keeping the total async time before
+      // navigator.share as short as possible so iOS doesn't drop the user gesture.
+      var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
-    // Fetch all remote files in parallel
-    var remoteBlobs = await Promise.all(
-      [THUMB_WORKER + '/promo-slide'].concat(
-        shots.map(function(u) { return THUMB_WORKER + '/download?url=' + encodeURIComponent(u); })
-      ).map(function(url) {
+      var iosFetchUrls = [
+        THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl),
+        THUMB_WORKER + '/frame',
+        THUMB_WORKER + '/promo-slide'
+      ].concat(shots.map(function(u) {
+        return THUMB_WORKER + '/download?url=' + encodeURIComponent(u);
+      }));
+
+      var allBlobs = await Promise.all(iosFetchUrls.map(function(url) {
         return fetch(url).then(function(r) {
-          if (!r.ok) throw new Error('Fetch failed: ' + r.status);
+          if (!r.ok) throw new Error('Fetch failed ' + r.status + ' – ' + url.split('/').pop().split('?')[0]);
           return r.blob();
         });
-      })
-    );
+      }));
 
-    var promoBlob = remoteBlobs[0];
-    var shotBlobs = remoteBlobs.slice(1);
+      var coverBlob = allBlobs[0];
+      var frameBlob = allBlobs[1];
+      var promoBlob = allBlobs[2];
+      var shotBlobs  = allBlobs.slice(3);
 
-    if (isIOS) {
-      // iOS Safari ignores <a download> — use Web Share API instead.
-      // Opens the native share sheet; user taps "Save Image" to save to Photos.
+      await loadGagalinFont();
+      var thumbBlob = await renderCanvasToBlob(title, coverBlob, frameBlob);
+
       var allFiles = [
         new File([thumbBlob], gameName + '1.png', { type: 'image/png' }),
         new File([promoBlob], gameName + '2.png', { type: 'image/png' })
@@ -1362,18 +1362,38 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
         }
       } catch (shareErr) {
         if (shareErr.name !== 'AbortError') throw shareErr;
-        // User cancelled the share sheet — treat as success
         shared = true;
       }
 
       if (!shared) {
-        // Fallback: open each image in a new tab for long-press saving
         allFiles.forEach(function(f) { window.open(URL.createObjectURL(f), '_blank'); });
         showToast('Hold each image to save to Photos');
       }
 
     } else {
-      // Desktop: save in reverse order so {game}1 lands newest in Downloads
+      // Desktop: render thumbnail from SVG preview, fetch remotes, save in reverse order
+      var canvas = document.createElement('canvas');
+      canvas.width = 1080; canvas.height = 1080;
+      var ctx = canvas.getContext('2d');
+      var image = new Image();
+      await new Promise(function(resolve) { image.onload = resolve; image.src = el('thumbPreview').src; });
+      ctx.drawImage(image, 0, 0, 1080, 1080);
+      var thumbBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
+
+      var remoteBlobs = await Promise.all(
+        [THUMB_WORKER + '/promo-slide'].concat(
+          shots.map(function(u) { return THUMB_WORKER + '/download?url=' + encodeURIComponent(u); })
+        ).map(function(url) {
+          return fetch(url).then(function(r) {
+            if (!r.ok) throw new Error('Fetch failed: ' + r.status);
+            return r.blob();
+          });
+        })
+      );
+
+      var promoBlob = remoteBlobs[0];
+      var shotBlobs = remoteBlobs.slice(1);
+
       var delay = function() { return new Promise(function(r) { setTimeout(r, 300); }); };
       for (var i = shotBlobs.length - 1; i >= 0; i--) {
         var b = shotBlobs[i];

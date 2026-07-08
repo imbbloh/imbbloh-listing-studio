@@ -1161,11 +1161,11 @@ el('thumbBtn').addEventListener('click', async function() {
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
 
-    // Skip cover (screenshotUrls[0] is same image) and screenshot 1; show from index 1
+    // File 1 = thumbnail, File 2 = promo; screenshots start at File 3
     var links = '';
     if (data.screenshotUrls && data.screenshotUrls.length > 1) {
       data.screenshotUrls.slice(1).forEach(function(url, i) {
-        links += (links ? '\n\n' : '') + 'Screenshot ' + (i + 1) + ':\n' + url;
+        links += (links ? '\n\n' : '') + 'Screenshot ' + (i + 1) + ' (File ' + (i + 3) + '):\n' + url;
       });
     }
     el('thumbLinks').textContent = links;

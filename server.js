@@ -51,7 +51,9 @@ function extractNintendoAssets(html) {
   if (!matches.length) throw new Error('Could not extract NSUID/hash from store page');
   const platform = matches[0][1];
   const nsuid    = matches[0][2];
-  const hashes   = [...new Set(matches.map(m => m[3]))];
+  const hashes   = [...new Set(
+    matches.filter(m => m[1] === platform && m[2] === nsuid).map(m => m[3])
+  )].slice(0, 10);
   return { platform, nsuid, hashes };
 }
 

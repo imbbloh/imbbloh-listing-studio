@@ -85,6 +85,11 @@ app.use((req, res, next) => {
 
 app.options('*', (req, res) => res.sendStatus(204));
 
+// ── Serve frontend ─────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // ── Promo slide endpoint ───────────────────────────────────────────────────
 // Serves ns-promo-slide.png from memory (loaded at startup) so the frontend
 // can download it via the same /download flow without hitting any CDN.

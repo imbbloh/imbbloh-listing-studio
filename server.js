@@ -273,11 +273,24 @@ async function sendViaPlaywright(price, files) {
       buffer:   f.buffer,
     }));
 
-    // Use fileChooser event — works regardless of shadow DOM or lazy rendering
+    // Step 1: Click attach button to open the dropdown menu
+    await page.locator('attach-menu-button, .attach-file, [class*="attach-file"]').first()
+      .click({ timeout: 10000 })
+      .catch(() => { throw new Error('Step 3/5 failed: attach button not found or not clickable'); });
+    await page.waitForTimeout(700);
+
+    // Step 2: Click "Photo or Video" menu item — this triggers the file chooser
     const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser', { timeout: 20000 })
-        .catch(() => { throw new Error('Step 3/5 failed: file chooser never opened — attach button click may have failed'); }),
-      page.locator('attach-menu-button, .attach-file, [class*="attach-file"]').first().click(),
+      page.waitForEvent('filechooser', { timeout: 15000 })
+        .catch(() => { throw new Error('Step 3/5 failed: file chooser did not open after clicking Photo/Video menu item'); }),
+      page.locator([
+        'button:has-text("Photo")',
+        '.btn-menu-item:has-text("Photo")',
+        'button:has-text("Media")',
+        '.btn-menu-item:has-text("Media")',
+        '.btn-menu-item',
+      ].join(', ')).first().click({ timeout: 5000 })
+        .catch(() => { throw new Error('Step 3/5 failed: Photo/Video option not found in attach menu'); }),
     ]);
     await fileChooser.setFiles(inputFiles);
 

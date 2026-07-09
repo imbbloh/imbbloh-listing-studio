@@ -267,40 +267,19 @@ async function sendViaPlaywright(price, files) {
       { timeout: 40000 }
     ).catch(() => { throw new Error('Step 2/5 failed: session expired or login page appeared — re-run setup-telegram-web.js'); });
 
-    // Telegram Web K lazy-renders the file input — click the attach button first
-    const attachBtnSelectors = [
-      'button.btn-icon[class*="attach"]',
-      '.attach-file',
-      'button[title*="ttach"]',
-      '.chat-input-attach',
-      'button.tgico-attach',
-    ];
-    for (const sel of attachBtnSelectors) {
-      const el = page.locator(sel).first();
-      if (await el.count() > 0) { await el.click(); await page.waitForTimeout(600); break; }
-    }
-
-    // After attach menu opens, look for a Photo/Video option
-    const photoSelectors = [
-      '.btn-menu-item[class*="photo"]',
-      '.btn-menu-item:has-text("Photo")',
-      '.btn-menu-item:has-text("Media")',
-      '.menu-open .btn-menu-item',
-    ];
-    for (const sel of photoSelectors) {
-      const el = page.locator(sel).first();
-      if (await el.count() > 0) { await el.click(); await page.waitForTimeout(400); break; }
-    }
-
-    const fileInput = await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15000 })
-      .catch(() => { throw new Error('Step 3/5 failed: file input not found — attach menu may have changed'); });
-
     const inputFiles = files.map((f, i) => ({
       name:     `image${i + 1}.${f.mimetype.includes('png') ? 'png' : 'jpg'}`,
       mimeType: f.mimetype,
       buffer:   f.buffer,
     }));
-    await fileInput.setInputFiles(inputFiles);
+
+    // Use fileChooser event — works regardless of shadow DOM or lazy rendering
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser', { timeout: 20000 })
+        .catch(() => { throw new Error('Step 3/5 failed: file chooser never opened — attach button click may have failed'); }),
+      page.locator('attach-menu-button, .attach-file, [class*="attach-file"]').first().click(),
+    ]);
+    await fileChooser.setFiles(inputFiles);
 
     await page.waitForSelector('.popup, .popup-container', { timeout: 20000 })
       .catch(() => { throw new Error('Step 4/5 failed: send-photo popup did not appear'); });

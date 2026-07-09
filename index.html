@@ -1348,11 +1348,18 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   btn.textContent = '⏳ Downloading…';
 
   var gameName = (el('gameName').value.trim() || 'game').replace(/[/\\?%*:|"<>]/g, '-');
-  // Feature-detect file sharing support rather than sniffing the UA —
-  // "Request Desktop Website" on iOS changes the UA but keeps navigator.share.
+  // Use share sheet on iOS/Android; fall back to direct download on desktop.
+  // maxTouchPoints === 0 means no touchscreen → real desktop PC.
+  // iOS in "Request Desktop Website" mode has no "iPhone" in UA but still has
+  // maxTouchPoints ≥ 5 (physical screen), so the share sheet stays for iOS.
   var useShareAPI = (function() {
-    try { return !!navigator.share && !!navigator.canShare && navigator.canShare({ files: [new File([''], 'test.png', { type: 'image/png' })] }); }
-    catch (e) { return false; }
+    try {
+      var noTouch = navigator.maxTouchPoints === 0;
+      var noMobileUA = !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      if (noTouch && noMobileUA) return false;
+      return !!navigator.share && !!navigator.canShare &&
+             navigator.canShare({ files: [new File([''], 'test.png', { type: 'image/png' })] });
+    } catch (e) { return false; }
   }());
 
   // Desktop: save blob as a named file download

@@ -164,6 +164,7 @@ app.post('/', async (req, res) => {
 
     res.json({
       thumbnailDataUrl,
+      coverBase64,
       coverUrl:       cdn.coverUrl,
       screenshotUrls: cdn.screenshotUrls
     });

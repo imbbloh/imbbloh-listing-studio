@@ -570,9 +570,10 @@ var CF = {
 var appMode   = 'game';   // 'game' | 'code'
 var platSel   = null;     // 'ns12' | 'ns2' | 'ps45' | 'ps5'
 var codeSub   = 'full';   // 'full' | 'dlc' | 'upgrade'
-var curCopy      = '';
-var curImageUrls = null; // { coverUrl, screenshotUrls } from last generation
-var curSvg       = null; // decoded SVG string for client-side title editing
+var curCopy         = '';
+var curImageUrls    = null; // { coverUrl, screenshotUrls } from last generation
+var curSvg          = null; // decoded SVG string for client-side title editing
+var curCoverDataUrl = null; // cover JPEG as data URL, set when thumbnail generated
 var curFilt   = 'all';
 var saved     = JSON.parse(localStorage.getItem('ibl') || '[]');
 
@@ -1263,6 +1264,7 @@ el('thumbBtn').addEventListener('click', async function() {
     for (var j = 0; j < svgBytes.length; j++) svgArr[j] = svgBytes.charCodeAt(j);
     curSvg = new TextDecoder('utf-8').decode(svgArr);
     gagalinFontPromise = null; // reset so loadGagalinFont() re-extracts from new SVG
+    curCoverDataUrl = data.coverBase64 ? 'data:image/jpeg;base64,' + data.coverBase64 : null;
     el('thumbTitle').value = gameTitle;
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
@@ -1314,7 +1316,12 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   btn.textContent = '⏳ Downloading…';
 
   var gameName = (el('gameName').value.trim() || 'game').replace(/[/\\?%*:|"<>]/g, '-');
-  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  // Feature-detect file sharing support rather than sniffing the UA —
+  // "Request Desktop Website" on iOS changes the UA but keeps navigator.share.
+  var useShareAPI = (function() {
+    try { return !!navigator.share && !!navigator.canShare && navigator.canShare({ files: [new File([''], 'test.png', { type: 'image/png' })] }); }
+    catch (e) { return false; }
+  }());
 
   // Desktop: save blob as a named file download
   function saveBlobAs(blob, filename) {
@@ -1328,16 +1335,18 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   try {
     var shots = (curImageUrls.screenshotUrls || []).slice(1);
 
-    if (isIOS) {
-      // iOS: extract cover JPEG + frame PNG data URLs from the SVG already in memory —
-      // no extra network fetches needed, and data URLs never taint the canvas.
+    if (useShareAPI) {
+      // Share-sheet path (iOS Safari, including desktop-mode): use renderCanvasToBlob
+      // to produce a clean PNG without canvas-taint issues.
       var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
-      var svgCoverMatch = curSvg && curSvg.match(/href="(data:image\/jpeg;base64,[^"]+)"/);
-      var svgFrameMatch = curSvg && curSvg.match(/href="(data:image\/png;base64,[^"]+)"/);
-      if (!svgCoverMatch || !svgFrameMatch) throw new Error('Thumbnail not generated yet — press Generate Thumbnail first');
+      // Cover: use data URL returned directly by the server (avoids regex on large base64)
+      var coverDataUrl = curCoverDataUrl;
+      if (!coverDataUrl) throw new Error('Thumbnail not generated yet — press Generate Thumbnail first');
 
-      var coverDataUrl = svgCoverMatch[1];
+      // Frame: extract from SVG in memory (static asset, always the same)
+      var svgFrameMatch = curSvg && curSvg.match(/href="(data:image\/png;base64,[^"]+)"/);
+      if (!svgFrameMatch) throw new Error('Thumbnail data missing — press Generate Thumbnail first');
       var frameDataUrl = svgFrameMatch[1];
 
       // Only fetch promo + screenshots; cover and frame come from SVG
@@ -1367,13 +1376,11 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
 
       var shared = false;
       try {
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: allFiles })) {
-          await navigator.share({ files: allFiles, title: gameName });
-          shared = true;
-        }
+        await navigator.share({ files: allFiles, title: gameName });
+        shared = true;
       } catch (shareErr) {
         if (shareErr.name !== 'AbortError') throw shareErr;
-        shared = true;
+        shared = true; // AbortError = user dismissed sheet, not an error
       }
 
       if (!shared) {

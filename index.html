@@ -1306,6 +1306,32 @@ el('thumbBtn').addEventListener('click', async function() {
   }
 });
 
+// Draws a blob to a tiny 16×9 canvas and returns true if >85% of pixels are near-white.
+// Used to drop Nintendo title-card screenshots before they reach navigator.share.
+function isMostlyWhite(blob) {
+  return new Promise(function(resolve) {
+    var objUrl = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function() {
+      try {
+        var c = document.createElement('canvas');
+        c.width = 16; c.height = 9;
+        var cx = c.getContext('2d');
+        cx.drawImage(img, 0, 0, 16, 9);
+        URL.revokeObjectURL(objUrl);
+        var d = cx.getImageData(0, 0, 16, 9).data;
+        var whites = 0;
+        for (var i = 0; i < d.length; i += 4) {
+          if (d[i] > 240 && d[i+1] > 240 && d[i+2] > 240) whites++;
+        }
+        resolve(whites / (16 * 9) > 0.85);
+      } catch (e) { URL.revokeObjectURL(objUrl); resolve(false); }
+    };
+    img.onerror = function() { URL.revokeObjectURL(objUrl); resolve(false); };
+    img.src = objUrl;
+  });
+}
+
 // ── Download All Images ────────────────────────────────────────────────────
 
 el('copyLinksToggle').addEventListener('click', function() {
@@ -1392,7 +1418,13 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     var promoBlob  = blobMap.promo;
     // Cover art for File 3: reuse the canvas cover blob when available (avoids double fetch)
     var boxartBlob = blobMap.cover || blobMap.boxart;
-    var shotBlobs = shots.map(function(_, i) { return blobMap['shot' + i]; });
+    var rawShotBlobs = shots.map(function(_, i) { return blobMap['shot' + i]; });
+    var shotBlobs = [];
+    for (var si = 0; si < rawShotBlobs.length; si++) {
+      if (rawShotBlobs[si] && !(await isMostlyWhite(rawShotBlobs[si]))) {
+        shotBlobs.push(rawShotBlobs[si]);
+      }
+    }
 
     // Both paths use explicit canvas compositing — drawing an SVG data URL to canvas
     // produces a blank/white image on iOS Safari when the SVG contains <image> elements.

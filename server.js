@@ -259,19 +259,17 @@ async function sendViaPlaywright(price, files) {
     const context = await browser.newContext({ storageState });
     const page    = await context.newPage();
 
-    // Open bot chat directly
-    await page.goto('https://web.telegram.org/k/#@CarousellOfficialBot', { timeout: 60000 });
+    await page.goto('https://web.telegram.org/k/#@CarousellOfficialBot', { timeout: 60000 })
+      .catch(() => { throw new Error('Step 1/5 failed: page load timed out'); });
 
-    // Confirm we are logged in (not on auth screen)
     await page.waitForFunction(
       () => !document.querySelector('.auth-form') && (document.querySelector('.chat-input') || document.querySelector('.bubbles')),
       { timeout: 40000 }
-    );
+    ).catch(() => { throw new Error('Step 2/5 failed: session expired or login page appeared — re-run setup-telegram-web.js'); });
 
-    // Find the hidden file input that Telegram Web always has in the DOM
-    const fileInput = await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15000 });
+    const fileInput = await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15000 })
+      .catch(() => { throw new Error('Step 3/5 failed: file input not found'); });
 
-    // Feed images as { name, mimeType, buffer } — no temp files needed
     const inputFiles = files.map((f, i) => ({
       name:     `image${i + 1}.${f.mimetype.includes('png') ? 'png' : 'jpg'}`,
       mimeType: f.mimetype,
@@ -279,10 +277,9 @@ async function sendViaPlaywright(price, files) {
     }));
     await fileInput.setInputFiles(inputFiles);
 
-    // Wait for the send-photo popup to appear
-    const popup = await page.waitForSelector('.popup, .popup-container', { timeout: 20000 });
+    await page.waitForSelector('.popup, .popup-container', { timeout: 20000 })
+      .catch(() => { throw new Error('Step 4/5 failed: send-photo popup did not appear'); });
 
-    // Type caption — try several selector patterns Telegram Web uses
     const captionSelectors = [
       '.popup .input-field-input',
       '.popup [contenteditable="true"]',
@@ -297,7 +294,6 @@ async function sendViaPlaywright(price, files) {
       }
     }
 
-    // Click Send (or fall back to Enter)
     const sendSelectors = ['.popup .btn-primary', '.popup .btn-send', '.popup button[class*="send"]'];
     let clicked = false;
     for (const sel of sendSelectors) {
@@ -306,7 +302,6 @@ async function sendViaPlaywright(price, files) {
     }
     if (!clicked) await page.keyboard.press('Enter');
 
-    // Give Telegram time to upload and deliver
     await page.waitForTimeout(6000);
 
   } finally {

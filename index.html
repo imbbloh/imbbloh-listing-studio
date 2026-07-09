@@ -382,6 +382,7 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 .btn-thumb:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-thumb:active:not(:disabled) { background: rgba(255,107,53,0.1); }
 
+
 .thumb-links {
   display: block; padding: 14px 18px;
   font-family: 'DM Mono', monospace; font-size: 0.72rem; line-height: 1.8;
@@ -530,8 +531,8 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <div style="margin-bottom:12px">
       <button class="btn-thumb" id="thumbDownloadAllBtn">⬇ Download All Images</button>
     </div>
-    <div class="card-title" style="margin-top:4px">📋 Copy Links</div>
-    <pre class="thumb-links" id="thumbLinks"></pre>
+    <button id="copyLinksToggle" style="width:100%;padding:10px 0;background:none;border:none;border-top:1px solid var(--border);color:var(--muted);font-family:'Syne',sans-serif;font-weight:700;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;text-align:left;padding:10px 0;margin-top:4px">📋 Copy Links ▸</button>
+    <pre class="thumb-links" id="thumbLinks" style="display:none"></pre>
   </div>
 
   <!-- Listings -->
@@ -570,9 +571,10 @@ var CF = {
 var appMode   = 'game';   // 'game' | 'code'
 var platSel   = null;     // 'ns12' | 'ns2' | 'ps45' | 'ps5'
 var codeSub   = 'full';   // 'full' | 'dlc' | 'upgrade'
-var curCopy      = '';
-var curImageUrls = null; // { coverUrl, screenshotUrls } from last generation
-var curSvg       = null; // decoded SVG string for client-side title editing
+var curCopy         = '';
+var curImageUrls    = null; // { coverUrl, screenshotUrls } from last generation
+var curSvg          = null; // decoded SVG string for client-side title editing
+var curCoverDataUrl = null; // cover JPEG as data URL, set when thumbnail generated
 var curFilt   = 'all';
 var saved     = JSON.parse(localStorage.getItem('ibl') || '[]');
 
@@ -700,10 +702,19 @@ function autoUrl() {
 }
 
 // ── Generate ───────────────────────────────────────────────────────────────
+function cleanTitle(s) {
+  return s
+    .replace(/[\u2122\u00ae\u00a9]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
 function doGenerate() {
-  var name = el('gameName').value.trim();
-  if (!name)    { showToast('Enter a game title', true); return; }
+  var raw  = el('gameName').value.trim();
+  if (!raw)     { showToast('Enter a game title', true); return; }
   if (!platSel) { showToast('Select a platform', true); return; }
+
+  var name = cleanTitle(raw); // remove ™ / ® / © and normalise é→e etc.
 
   if (appMode === 'code') {
     genCode(name);
@@ -927,7 +938,7 @@ function doCopy() {
 
 // ── Save to Sheets ─────────────────────────────────────────────────────────
 function doSave() {
-  var name = el('gameName').value.trim();
+  var name = cleanTitle(el('gameName').value.trim());
   if (!curCopy) return;
 
   el('saveBtn').disabled = true;
@@ -1127,6 +1138,74 @@ el('listBox').addEventListener('click', function(e) {
   }
 });
 
+// ── iOS thumbnail renderer ─────────────────────────────────────────────────
+// iOS Safari taints the canvas when drawing an SVG that contains embedded
+// images, so toBlob() fails. Instead we redraw each layer individually using
+// blob URLs fetched from the same origin — no taint, clean PNG output.
+var gagalinFontPromise = null;
+
+function loadGagalinFont() {
+  if (gagalinFontPromise) return gagalinFontPromise;
+  // Use indexOf/substring instead of regex — more reliable for the 335 KB OTF
+  // base64 string on iOS Safari's JavaScriptCore engine.
+  var fontSrc = THUMB_WORKER + '/font'; // server fallback
+  if (curSvg) {
+    var prefix = "src: url('data:font/otf;base64,";
+    var s = curSvg.indexOf(prefix);
+    if (s !== -1) {
+      s += prefix.length;
+      var e = curSvg.indexOf("')", s);
+      if (e !== -1) fontSrc = 'data:font/otf;base64,' + curSvg.substring(s, e);
+    }
+  }
+  gagalinFontPromise = new FontFace('Gagalin', 'url(' + fontSrc + ')')
+    .load().then(function(f) { document.fonts.add(f); });
+  return gagalinFontPromise;
+}
+
+// Renders a 1080×1080 thumbnail PNG from data URLs already in memory.
+// Data URLs don't taint the canvas (unlike cross-origin image src), so
+// toBlob() works correctly on iOS Safari.
+async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl) {
+  var canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1080;
+  var ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#e8001d';
+  ctx.fillRect(0, 0, 1080, 1080);
+
+  var coverImg = new Image();
+  await new Promise(function(resolve, reject) {
+    coverImg.onload = resolve;
+    coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
+    coverImg.src = coverDataUrl;
+  });
+  ctx.drawImage(coverImg, 0, 295, 1080, 640);
+
+  var frameImg = new Image();
+  await new Promise(function(resolve, reject) {
+    frameImg.onload = resolve;
+    frameImg.onerror = function() { reject(new Error('Frame image failed to load')); };
+    frameImg.src = frameDataUrl;
+  });
+  ctx.drawImage(frameImg, 0, 0, 1080, 1080);
+
+  var fontSize = thumbTitleFontSize(title.length);
+  ctx.fillStyle = 'white';
+  ctx.font = '900 ' + fontSize + 'px Gagalin, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+  ctx.fillText(title, 540, 1008);
+
+  return new Promise(function(resolve, reject) {
+    canvas.toBlob(function(blob) {
+      if (blob) resolve(blob);
+      else reject(new Error('Canvas toBlob returned null'));
+    }, 'image/png');
+  });
+}
+
 // ── Thumbnail title editor ─────────────────────────────────────────────────
 function thumbTitleFontSize(n) {
   if (n <= 12) return 80;
@@ -1183,28 +1262,35 @@ el('thumbBtn').addEventListener('click', async function() {
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Worker error ' + res.status);
 
-    var thumbImg = el('thumbPreview');
-    thumbImg.src = data.thumbnailDataUrl;
-
-    // Decode SVG for client-side title editing
+    // Decode SVG and wait for the <img> to fully paint (cover JPEG inside SVG
+    // loads async; without waiting the card flashes a plain red background first).
     var svgBytes = atob(data.thumbnailDataUrl.split(',')[1]);
     var svgArr = new Uint8Array(svgBytes.length);
     for (var j = 0; j < svgBytes.length; j++) svgArr[j] = svgBytes.charCodeAt(j);
     curSvg = new TextDecoder('utf-8').decode(svgArr);
+    gagalinFontPromise = null; // reset so loadGagalinFont() re-extracts from new SVG
+    curCoverDataUrl = data.coverBase64 ? 'data:image/jpeg;base64,' + data.coverBase64 : null;
     el('thumbTitle').value = gameTitle;
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
 
-    // Build copy links: File 1 (thumbnail), File 2 (promo), then screenshots
+    // Build copy links: File 1 (thumbnail), File 2 (promo), File 3 (cover art), Files 4-8 (screenshots)
     var links =
-      'Thumbnail (File 1):\n' + data.coverUrl +
-      '\n\nPromo (File 2):\n' + THUMB_WORKER + '/promo-slide';
+      'Thumbnail (File 1): [generated — use downloaded file]' +
+      '\n\nPromo (File 2):\n' + THUMB_WORKER + '/promo-slide' +
+      '\n\nCover Art (File 3):\n' + data.coverUrl;
     if (data.screenshotUrls && data.screenshotUrls.length > 1) {
-      data.screenshotUrls.slice(1).forEach(function(url, i) {
-        links += '\n\nScreenshot ' + (i + 1) + ' (File ' + (i + 3) + '):\n' + url;
+      data.screenshotUrls.slice(1, 8).forEach(function(url, i) {
+        links += '\n\nScreenshot ' + (i + 1) + ' (File ' + (i + 4) + '):\n' + url;
       });
     }
     el('thumbLinks').textContent = links;
+
+    var thumbImg = el('thumbPreview');
+    await new Promise(function(resolve) {
+      thumbImg.onload = resolve;
+      thumbImg.src = data.thumbnailDataUrl;
+    });
 
     el('thumbCard').style.display = 'block';
     btn.textContent = '✓ Done';
@@ -1220,7 +1306,40 @@ el('thumbBtn').addEventListener('click', async function() {
   }
 });
 
+// Draws a blob to a tiny 16×9 canvas and returns true if >85% of pixels are near-white.
+// Used to drop Nintendo title-card screenshots before they reach navigator.share.
+function isMostlyWhite(blob) {
+  return new Promise(function(resolve) {
+    var objUrl = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function() {
+      try {
+        var c = document.createElement('canvas');
+        c.width = 16; c.height = 9;
+        var cx = c.getContext('2d');
+        cx.drawImage(img, 0, 0, 16, 9);
+        URL.revokeObjectURL(objUrl);
+        var d = cx.getImageData(0, 0, 16, 9).data;
+        var whites = 0;
+        for (var i = 0; i < d.length; i += 4) {
+          if (d[i] > 240 && d[i+1] > 240 && d[i+2] > 240) whites++;
+        }
+        resolve(whites / (16 * 9) > 0.85);
+      } catch (e) { URL.revokeObjectURL(objUrl); resolve(false); }
+    };
+    img.onerror = function() { URL.revokeObjectURL(objUrl); resolve(false); };
+    img.src = objUrl;
+  });
+}
+
 // ── Download All Images ────────────────────────────────────────────────────
+
+el('copyLinksToggle').addEventListener('click', function() {
+  var pre = el('thumbLinks');
+  var open = pre.style.display !== 'none';
+  pre.style.display = open ? 'none' : 'block';
+  this.textContent = '📋 Copy Links ' + (open ? '▸' : '▾');
+});
 
 el('thumbDownloadAllBtn').addEventListener('click', async function() {
   if (!curImageUrls) return;
@@ -1229,58 +1348,129 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   btn.textContent = '⏳ Downloading…';
 
   var gameName = (el('gameName').value.trim() || 'game').replace(/[/\\?%*:|"<>]/g, '-');
+  // Use share sheet on iOS/Android; fall back to direct download on desktop.
+  // maxTouchPoints === 0 means no touchscreen → real desktop PC.
+  // iOS in "Request Desktop Website" mode has no "iPhone" in UA but still has
+  // maxTouchPoints ≥ 5 (physical screen), so the share sheet stays for iOS.
+  var useShareAPI = (function() {
+    try {
+      var noTouch = navigator.maxTouchPoints === 0;
+      var noMobileUA = !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      if (noTouch && noMobileUA) return false;
+      return !!navigator.share && !!navigator.canShare &&
+             navigator.canShare({ files: [new File([''], 'test.png', { type: 'image/png' })] });
+    } catch (e) { return false; }
+  }());
 
-  // Save a blob to disk under the given filename (instant, no network wait)
+  // Desktop: save blob as a named file download
   function saveBlobAs(blob, filename) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
   }
 
   try {
-    var shots = (curImageUrls.screenshotUrls || []).slice(1);
+    var shots = (curImageUrls.screenshotUrls || []).slice(1, 8);
+    var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
-    // Render thumbnail to blob
-    var canvas = document.createElement('canvas');
-    canvas.width = 1080; canvas.height = 1080;
-    var ctx = canvas.getContext('2d');
-    var image = new Image();
-    await new Promise(function(resolve) { image.onload = resolve; image.src = el('thumbPreview').src; });
-    ctx.drawImage(image, 0, 0, 1080, 1080);
-    var thumbBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
-
-    // Fetch all remote files in parallel — network work happens concurrently
-    var remoteBlobs = await Promise.all(
-      [THUMB_WORKER + '/promo-slide'].concat(
-        shots.map(function(u) { return THUMB_WORKER + '/download?url=' + encodeURIComponent(u); })
-      ).map(function(url) {
-        return fetch(url).then(function(r) {
-          if (!r.ok) throw new Error('Fetch failed: ' + r.status);
-          return r.blob();
-        });
-      })
-    );
-
-    // Save in reverse order so the last file triggered ({game}1) lands newest
-    // in the downloads folder — making it easy to select files in upload order.
-    var delay = function() { return new Promise(function(r) { setTimeout(r, 300); }); };
-
-    for (var i = shots.length - 1; i >= 0; i--) {
-      var b = remoteBlobs[i + 1];
-      var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
-      saveBlobAs(b, gameName + (i + 3) + ext);
-      await delay();
+    // Extract assets from the decoded SVG using indexOf/substring.
+    // Regex can silently fail on iOS Safari when capture groups span 300-400 KB.
+    function extractSvgAsset(prefix, suffix) {
+      if (!curSvg) return null;
+      var s = curSvg.indexOf(prefix);
+      if (s === -1) return null;
+      s += prefix.length;
+      var e = curSvg.indexOf(suffix, s);
+      return e === -1 ? null : curSvg.substring(s, e);
     }
 
-    saveBlobAs(remoteBlobs[0], gameName + '2.png');
-    await delay();
+    // Cover: server JSON → SVG extraction → network fetch (never throws)
+    var coverJpegB64 = extractSvgAsset('href="data:image/jpeg;base64,', '"');
+    var coverDataUrl = curCoverDataUrl || (coverJpegB64 ? 'data:image/jpeg;base64,' + coverJpegB64 : null);
 
-    saveBlobAs(thumbBlob, gameName + '1.png');
+    // Frame: SVG extraction → network fetch fallback
+    var framePngB64 = extractSvgAsset('href="data:image/png;base64,', '"');
+    var frameDataUrl = framePngB64 ? 'data:image/png;base64,' + framePngB64 : null;
+
+    // Single parallel fetch for anything missing from memory, plus promo, cover art, and screenshots.
+    // If cover was already in memory (not fetched for canvas), fetch it separately for boxart file.
+    var needCoverFetch = !coverDataUrl;
+    var fetchItems = [];
+    if (needCoverFetch) fetchItems.push({ key: 'cover', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
+    if (!frameDataUrl) fetchItems.push({ key: 'frame', url: THUMB_WORKER + '/frame' });
+    fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/promo-slide' });
+    if (!needCoverFetch) fetchItems.push({ key: 'boxart', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
+    shots.forEach(function(u, i) {
+      fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
+    });
+
+    var fetchedBlobs = await Promise.all(fetchItems.map(function(item) {
+      return fetch(item.url).then(function(r) {
+        if (!r.ok) throw new Error(item.key + ' fetch failed: ' + r.status);
+        return r.blob();
+      });
+    }));
+
+    var blobMap = {};
+    fetchItems.forEach(function(item, i) { blobMap[item.key] = fetchedBlobs[i]; });
+
+    // Same-origin object URLs don't taint the canvas
+    var coverBlobUrl = blobMap.cover ? URL.createObjectURL(blobMap.cover) : null;
+    var frameBlobUrl = blobMap.frame ? URL.createObjectURL(blobMap.frame) : null;
+    if (coverBlobUrl) coverDataUrl = coverBlobUrl;
+    if (frameBlobUrl) frameDataUrl = frameBlobUrl;
+
+    var promoBlob  = blobMap.promo;
+    // Cover art for File 3: reuse the canvas cover blob when available (avoids double fetch)
+    var boxartBlob = blobMap.cover || blobMap.boxart;
+    var rawShotBlobs = shots.map(function(_, i) { return blobMap['shot' + i]; });
+    var shotBlobs = [];
+    for (var si = 0; si < rawShotBlobs.length; si++) {
+      if (rawShotBlobs[si] && !(await isMostlyWhite(rawShotBlobs[si]))) {
+        shotBlobs.push(rawShotBlobs[si]);
+      }
+    }
+
+    // Both paths use explicit canvas compositing — drawing an SVG data URL to canvas
+    // produces a blank/white image on iOS Safari when the SVG contains <image> elements.
+    try { await loadGagalinFont(); } catch (e) { /* fall back to system font */ }
+    var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl);
+
+    if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
+    if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);
+
+    // File layout: 1=thumbnail, 2=promo, 3=cover art (box art), 4-8=screenshots (max 5)
+    if (useShareAPI) {
+      var allFiles = [
+        new File([thumbBlob],  gameName + '1.png', { type: 'image/png' }),
+        new File([promoBlob],  gameName + '2.png', { type: 'image/png' }),
+        new File([boxartBlob], gameName + '3.' + (boxartBlob.type.includes('png') ? 'png' : 'jpg'), { type: boxartBlob.type })
+      ].concat(shotBlobs.map(function(b, i) {
+        var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
+        return new File([b], gameName + (i + 4) + ext, { type: b.type });
+      }));
+
+      try {
+        await navigator.share({ files: allFiles });
+      } catch (shareErr) {
+        if (shareErr.name !== 'AbortError') throw shareErr;
+      }
+    } else {
+      var delay = function() { return new Promise(function(r) { setTimeout(r, 300); }); };
+      for (var i = shotBlobs.length - 1; i >= 0; i--) {
+        var b = shotBlobs[i];
+        var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
+        saveBlobAs(b, gameName + (i + 4) + ext);
+        await delay();
+      }
+      saveBlobAs(boxartBlob, gameName + '3.' + (boxartBlob.type.includes('png') ? 'png' : 'jpg'));
+      await delay();
+      saveBlobAs(promoBlob, gameName + '2.png');
+      await delay();
+      saveBlobAs(thumbBlob, gameName + '1.png');
+    }
 
     btn.disabled = false;
     btn.textContent = '⬇ Download All Images';

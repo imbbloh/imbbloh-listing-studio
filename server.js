@@ -3,9 +3,11 @@ const fs      = require('fs');
 const path    = require('path');
 
 // Load static assets from disk once at startup — no CDN fetches, no 429 risk
-const FRAME_BASE64 = fs.readFileSync(path.join(__dirname, 'assets/ns-template-frame.png')).toString('base64');
-const FONT_BASE64  = fs.readFileSync(path.join(__dirname, 'assets/gagalin.otf')).toString('base64');
+const FRAME_PNG    = fs.readFileSync(path.join(__dirname, 'assets/ns-template-frame.png'));
+const FONT_OTF     = fs.readFileSync(path.join(__dirname, 'assets/gagalin.otf'));
 const PROMO_PNG    = fs.readFileSync(path.join(__dirname, 'assets/ns-promo-slide.png'));
+const FRAME_BASE64 = FRAME_PNG.toString('base64');
+const FONT_BASE64  = FONT_OTF.toString('base64');
 
 const CANVAS_W  = 1080;
 const CANVAS_H  = 1080;
@@ -78,7 +80,7 @@ app.use(express.json());
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   next();
 });
@@ -91,6 +93,19 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 // ── Serve frontend ─────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// ── Static asset endpoints (used by iOS canvas renderer) ──────────────────
+app.get('/frame', (req, res) => {
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(FRAME_PNG);
+});
+
+app.get('/font', (req, res) => {
+  res.setHeader('Content-Type', 'font/otf');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(FONT_OTF);
 });
 
 // ── Promo slide endpoint ───────────────────────────────────────────────────
@@ -149,6 +164,7 @@ app.post('/', async (req, res) => {
 
     res.json({
       thumbnailDataUrl,
+      coverBase64,
       coverUrl:       cdn.coverUrl,
       screenshotUrls: cdn.screenshotUrls
     });

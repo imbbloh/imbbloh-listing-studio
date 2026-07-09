@@ -1145,13 +1145,17 @@ var gagalinFontPromise = null;
 
 function loadGagalinFont() {
   if (gagalinFontPromise) return gagalinFontPromise;
-  // Extract font data URL from the SVG already in memory (same approach as cover/frame).
-  // This avoids a /font network fetch and guarantees the exact same OTF that rendered
-  // the SVG preview is used for the canvas text — no server dependency, no 404 risk.
-  var fontSrc = THUMB_WORKER + '/font'; // fallback if SVG not ready
+  // Use indexOf/substring instead of regex — more reliable for the 335 KB OTF
+  // base64 string on iOS Safari's JavaScriptCore engine.
+  var fontSrc = THUMB_WORKER + '/font'; // server fallback
   if (curSvg) {
-    var m = curSvg.match(/src: url\('(data:font\/otf;base64,[^']+)'\)/);
-    if (m) fontSrc = m[1];
+    var prefix = "src: url('data:font/otf;base64,";
+    var s = curSvg.indexOf(prefix);
+    if (s !== -1) {
+      s += prefix.length;
+      var e = curSvg.indexOf("')", s);
+      if (e !== -1) fontSrc = 'data:font/otf;base64,' + curSvg.substring(s, e);
+    }
   }
   gagalinFontPromise = new FontFace('Gagalin', 'url(' + fontSrc + ')')
     .load().then(function(f) { document.fonts.add(f); });
@@ -1336,40 +1340,61 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     var shots = (curImageUrls.screenshotUrls || []).slice(1);
 
     if (useShareAPI) {
-      // Share-sheet path (iOS Safari, including desktop-mode): use renderCanvasToBlob
-      // to produce a clean PNG without canvas-taint issues.
       var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
-      // Cover: prefer the clean base64 field from the server; fall back to
-      // regex extraction from curSvg for thumbnails generated before this deploy.
-      var coverDataUrl = curCoverDataUrl;
-      if (!coverDataUrl && curSvg) {
-        var svgCoverMatch = curSvg.match(/href="(data:image\/jpeg;base64,[^"]+)"/);
-        if (svgCoverMatch) coverDataUrl = svgCoverMatch[1];
+      // Extract assets from the decoded SVG in memory using indexOf/substring.
+      // Regex can silently fail on iOS Safari when the capture group spans 300-400 KB.
+      function extractSvgAsset(prefix, suffix) {
+        if (!curSvg) return null;
+        var s = curSvg.indexOf(prefix);
+        if (s === -1) return null;
+        s += prefix.length;
+        var e = curSvg.indexOf(suffix, s);
+        return e === -1 ? null : curSvg.substring(s, e);
       }
-      if (!coverDataUrl) throw new Error('Thumbnail not generated yet — press Generate Thumbnail first');
 
-      // Frame: extract from SVG in memory (static asset, always the same)
-      var svgFrameMatch = curSvg && curSvg.match(/href="(data:image\/png;base64,[^"]+)"/);
-      if (!svgFrameMatch) throw new Error('Thumbnail data missing — press Generate Thumbnail first');
-      var frameDataUrl = svgFrameMatch[1];
+      // Cover: server JSON field → SVG extraction → network fetch (never throws)
+      var coverJpegB64 = extractSvgAsset('href="data:image/jpeg;base64,', '"');
+      var coverDataUrl = curCoverDataUrl || (coverJpegB64 ? 'data:image/jpeg;base64,' + coverJpegB64 : null);
 
-      // Only fetch promo + screenshots; cover and frame come from SVG
-      var remoteUrls = [THUMB_WORKER + '/promo-slide'].concat(
-        shots.map(function(u) { return THUMB_WORKER + '/download?url=' + encodeURIComponent(u); })
-      );
-      var remoteBlobs = await Promise.all(remoteUrls.map(function(url) {
-        return fetch(url).then(function(r) {
-          if (!r.ok) throw new Error('Fetch failed ' + r.status + ' – ' + url.split('/').pop().split('?')[0]);
+      // Frame: SVG extraction → network fetch fallback
+      var framePngB64  = extractSvgAsset('href="data:image/png;base64,', '"');
+      var frameDataUrl = framePngB64 ? 'data:image/png;base64,' + framePngB64 : null;
+
+      // Build parallel fetch list — add cover/frame only when in-memory data is missing.
+      // Same-origin blob: URLs produced from these fetches do NOT taint the canvas.
+      var fetchItems = [];
+      if (!coverDataUrl) fetchItems.push({ key: 'cover', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
+      if (!frameDataUrl) fetchItems.push({ key: 'frame', url: THUMB_WORKER + '/frame' });
+      fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/promo-slide' });
+      shots.forEach(function(u, i) {
+        fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
+      });
+
+      var fetchedBlobs = await Promise.all(fetchItems.map(function(item) {
+        return fetch(item.url).then(function(r) {
+          if (!r.ok) throw new Error(item.key + ' fetch failed: ' + r.status);
           return r.blob();
         });
       }));
 
-      var promoBlob = remoteBlobs[0];
-      var shotBlobs  = remoteBlobs.slice(1);
+      var blobMap = {};
+      fetchItems.forEach(function(item, i) { blobMap[item.key] = fetchedBlobs[i]; });
 
-      try { await loadGagalinFont(); } catch (e) { /* fall back to system font */ }
+      // Convert network blobs to object URLs (same-origin → no canvas taint)
+      var coverBlobUrl = blobMap.cover ? URL.createObjectURL(blobMap.cover) : null;
+      var frameBlobUrl = blobMap.frame ? URL.createObjectURL(blobMap.frame) : null;
+      if (coverBlobUrl) coverDataUrl = coverBlobUrl;
+      if (frameBlobUrl) frameDataUrl = frameBlobUrl;
+
+      var promoBlob = blobMap.promo;
+      var shotBlobs  = shots.map(function(_, i) { return blobMap['shot' + i]; });
+
+      try { await loadGagalinFont(); } catch (e) { /* use system font */ }
       var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl);
+
+      if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
+      if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);
 
       var allFiles = [
         new File([thumbBlob], gameName + '1.png', { type: 'image/png' }),
@@ -1385,7 +1410,7 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
         shared = true;
       } catch (shareErr) {
         if (shareErr.name !== 'AbortError') throw shareErr;
-        shared = true; // AbortError = user dismissed sheet, not an error
+        shared = true;
       }
 
       if (!shared) {

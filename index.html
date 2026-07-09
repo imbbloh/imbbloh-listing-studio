@@ -1150,7 +1150,10 @@ function loadGagalinFont() {
   return gagalinFontPromise;
 }
 
-async function renderCanvasToBlob(title, coverBlob, frameBlob) {
+// Renders a 1080×1080 thumbnail PNG from data URLs already in memory.
+// Data URLs don't taint the canvas (unlike cross-origin image src), so
+// toBlob() works correctly on iOS Safari.
+async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl) {
   var canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1080;
   var ctx = canvas.getContext('2d');
@@ -1159,24 +1162,20 @@ async function renderCanvasToBlob(title, coverBlob, frameBlob) {
   ctx.fillRect(0, 0, 1080, 1080);
 
   var coverImg = new Image();
-  var coverObjUrl = URL.createObjectURL(coverBlob);
   await new Promise(function(resolve, reject) {
     coverImg.onload = resolve;
     coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
-    coverImg.src = coverObjUrl;
+    coverImg.src = coverDataUrl;
   });
   ctx.drawImage(coverImg, 0, 295, 1080, 640);
-  URL.revokeObjectURL(coverObjUrl);
 
   var frameImg = new Image();
-  var frameObjUrl = URL.createObjectURL(frameBlob);
   await new Promise(function(resolve, reject) {
     frameImg.onload = resolve;
     frameImg.onerror = function() { reject(new Error('Frame image failed to load')); };
-    frameImg.src = frameObjUrl;
+    frameImg.src = frameDataUrl;
   });
   ctx.drawImage(frameImg, 0, 0, 1080, 1080);
-  URL.revokeObjectURL(frameObjUrl);
 
   var fontSize = thumbTitleFontSize(title.length);
   ctx.fillStyle = 'white';
@@ -1322,33 +1321,33 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     var shots = (curImageUrls.screenshotUrls || []).slice(1);
 
     if (isIOS) {
-      // iOS: fetch cover, frame, promo, and all screenshots in one parallel batch,
-      // then render the canvas, then share — keeping the total async time before
-      // navigator.share as short as possible so iOS doesn't drop the user gesture.
+      // iOS: extract cover JPEG + frame PNG data URLs from the SVG already in memory —
+      // no extra network fetches needed, and data URLs never taint the canvas.
       var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
-      var iosFetchUrls = [
-        THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl),
-        THUMB_WORKER + '/frame',
-        THUMB_WORKER + '/promo-slide'
-      ].concat(shots.map(function(u) {
-        return THUMB_WORKER + '/download?url=' + encodeURIComponent(u);
-      }));
+      var svgCoverMatch = curSvg && curSvg.match(/href="(data:image\/jpeg;base64,[^"]+)"/);
+      var svgFrameMatch = curSvg && curSvg.match(/href="(data:image\/png;base64,[^"]+)"/);
+      if (!svgCoverMatch || !svgFrameMatch) throw new Error('Thumbnail not generated yet — press Generate Thumbnail first');
 
-      var allBlobs = await Promise.all(iosFetchUrls.map(function(url) {
+      var coverDataUrl = svgCoverMatch[1];
+      var frameDataUrl = svgFrameMatch[1];
+
+      // Only fetch promo + screenshots; cover and frame come from SVG
+      var remoteUrls = [THUMB_WORKER + '/promo-slide'].concat(
+        shots.map(function(u) { return THUMB_WORKER + '/download?url=' + encodeURIComponent(u); })
+      );
+      var remoteBlobs = await Promise.all(remoteUrls.map(function(url) {
         return fetch(url).then(function(r) {
           if (!r.ok) throw new Error('Fetch failed ' + r.status + ' – ' + url.split('/').pop().split('?')[0]);
           return r.blob();
         });
       }));
 
-      var coverBlob = allBlobs[0];
-      var frameBlob = allBlobs[1];
-      var promoBlob = allBlobs[2];
-      var shotBlobs  = allBlobs.slice(3);
+      var promoBlob = remoteBlobs[0];
+      var shotBlobs  = remoteBlobs.slice(1);
 
-      await loadGagalinFont();
-      var thumbBlob = await renderCanvasToBlob(title, coverBlob, frameBlob);
+      try { await loadGagalinFont(); } catch (e) { /* fall back to system font */ }
+      var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl);
 
       var allFiles = [
         new File([thumbBlob], gameName + '1.png', { type: 'image/png' }),

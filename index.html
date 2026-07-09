@@ -382,6 +382,30 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 .btn-thumb:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-thumb:active:not(:disabled) { background: rgba(255,107,53,0.1); }
 
+/* ── Screenshot selector ── */
+#screenshotSelector { margin-bottom: 12px; }
+#screenshotSelector .sel-label {
+  font-size: 0.68rem; font-family: 'Syne', sans-serif; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 6px;
+}
+#screenshotGrid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+}
+.shot-thumb {
+  position: relative; aspect-ratio: 16/9; border-radius: 5px; overflow: hidden;
+  cursor: pointer; border: 2px solid var(--green);
+  -webkit-tap-highlight-color: transparent;
+}
+.shot-thumb.deselected { opacity: 0.35; border-color: var(--border); }
+.shot-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot-x {
+  display: none; position: absolute; inset: 0;
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.5); color: white; font-size: 18px; font-weight: 900;
+}
+.shot-thumb.deselected .shot-x { display: flex; }
+
 .thumb-links {
   display: block; padding: 14px 18px;
   font-family: 'DM Mono', monospace; font-size: 0.72rem; line-height: 1.8;
@@ -526,6 +550,10 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <div class="form-group" style="margin-bottom:14px">
       <label>Edit Title</label>
       <input type="text" id="thumbTitle" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div id="screenshotSelector" style="display:none">
+      <div class="sel-label">Screenshots — tap to deselect</div>
+      <div id="screenshotGrid"></div>
     </div>
     <div style="margin-bottom:12px">
       <button class="btn-thumb" id="thumbDownloadAllBtn">⬇ Download All Images</button>
@@ -1285,6 +1313,32 @@ el('thumbBtn').addEventListener('click', async function() {
     }
     el('thumbLinks').textContent = links;
 
+    // Populate screenshot selector grid
+    var selGrid = el('screenshotGrid');
+    selGrid.innerHTML = '';
+    var thumbScreenshots = data.screenshotUrls ? data.screenshotUrls.slice(1, 8) : [];
+    if (thumbScreenshots.length > 0) {
+      thumbScreenshots.forEach(function(url, i) {
+        var div = document.createElement('div');
+        div.className = 'shot-thumb';
+        div.dataset.index = String(i);
+        var img = document.createElement('img');
+        img.src = url;
+        img.loading = 'lazy';
+        img.onerror = function() { div.style.display = 'none'; };
+        var x = document.createElement('div');
+        x.className = 'shot-x';
+        x.textContent = '✕';
+        div.appendChild(img);
+        div.appendChild(x);
+        div.addEventListener('click', function() { this.classList.toggle('deselected'); });
+        selGrid.appendChild(div);
+      });
+      el('screenshotSelector').style.display = 'block';
+    } else {
+      el('screenshotSelector').style.display = 'none';
+    }
+
     var thumbImg = el('thumbPreview');
     await new Promise(function(resolve) {
       thumbImg.onload = resolve;
@@ -1338,8 +1392,12 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   }
 
   try {
-    // Limit to 7 screenshots so total = thumbnail + promo + cover art + 7 = 10 files max.
-    var shots = (curImageUrls.screenshotUrls || []).slice(1, 8);
+    // Use screenshots that are still selected in the preview grid (user may have deselected some)
+    var allScreenshots = (curImageUrls.screenshotUrls || []).slice(1, 8);
+    var shots = allScreenshots.filter(function(_, i) {
+      var thumb = el('screenshotGrid').querySelector('[data-index="' + i + '"]');
+      return !thumb || !thumb.classList.contains('deselected');
+    });
     var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
     // Extract assets from the decoded SVG using indexOf/substring.

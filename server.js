@@ -244,12 +244,15 @@ async function sendViaPlaywright(price, files) {
   const sessionB64 = process.env.TELEGRAM_WEB_SESSION;
   if (!sessionB64) throw new Error('TELEGRAM_WEB_SESSION not set — run setup-telegram-web.js');
 
-  const { chromium } = require('playwright');
+  const sparticuz  = require('@sparticuz/chromium');
+  const { chromium } = require('playwright-core');
   const storageState = JSON.parse(Buffer.from(sessionB64, 'base64').toString('utf-8'));
 
+  const executablePath = await sparticuz.executablePath();
   const browser = await chromium.launch({
+    args: [...sparticuz.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--no-zygote'],
+    executablePath,
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote'],
   });
 
   try {

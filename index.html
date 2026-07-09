@@ -1273,13 +1273,14 @@ el('thumbBtn').addEventListener('click', async function() {
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
 
-    // Build copy links: File 1 (thumbnail), File 2 (promo), then screenshots
+    // Build copy links: File 1 (thumbnail), File 2 (promo), File 3 (cover art), Files 4-8 (screenshots)
     var links =
-      'Thumbnail (File 1):\n' + data.coverUrl +
-      '\n\nPromo (File 2):\n' + THUMB_WORKER + '/promo-slide';
+      'Thumbnail (File 1): [generated — use downloaded file]' +
+      '\n\nPromo (File 2):\n' + THUMB_WORKER + '/promo-slide' +
+      '\n\nCover Art (File 3):\n' + data.coverUrl;
     if (data.screenshotUrls && data.screenshotUrls.length > 1) {
-      data.screenshotUrls.slice(1).forEach(function(url, i) {
-        links += '\n\nScreenshot ' + (i + 1) + ' (File ' + (i + 3) + '):\n' + url;
+      data.screenshotUrls.slice(1, 6).forEach(function(url, i) {
+        links += '\n\nScreenshot ' + (i + 1) + ' (File ' + (i + 4) + '):\n' + url;
       });
     }
     el('thumbLinks').textContent = links;
@@ -1337,7 +1338,8 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   }
 
   try {
-    var shots = (curImageUrls.screenshotUrls || []).slice(1);
+    // Limit to 5 screenshots so total = thumbnail + promo + cover art + 5 = 8 files max.
+    var shots = (curImageUrls.screenshotUrls || []).slice(1, 6);
     var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
     // Extract assets from the decoded SVG using indexOf/substring.
@@ -1359,11 +1361,14 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     var framePngB64 = extractSvgAsset('href="data:image/png;base64,', '"');
     var frameDataUrl = framePngB64 ? 'data:image/png;base64,' + framePngB64 : null;
 
-    // Single parallel fetch for anything missing from memory, plus promo and screenshots.
+    // Single parallel fetch for anything missing from memory, plus promo, cover art, and screenshots.
+    // If cover was already in memory (not fetched for canvas), fetch it separately for boxart file.
+    var needCoverFetch = !coverDataUrl;
     var fetchItems = [];
-    if (!coverDataUrl) fetchItems.push({ key: 'cover', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
+    if (needCoverFetch) fetchItems.push({ key: 'cover', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
     if (!frameDataUrl) fetchItems.push({ key: 'frame', url: THUMB_WORKER + '/frame' });
     fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/promo-slide' });
+    if (!needCoverFetch) fetchItems.push({ key: 'boxart', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
     shots.forEach(function(u, i) {
       fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
     });
@@ -1384,8 +1389,10 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     if (coverBlobUrl) coverDataUrl = coverBlobUrl;
     if (frameBlobUrl) frameDataUrl = frameBlobUrl;
 
-    var promoBlob = blobMap.promo;
-    var shotBlobs = shots.map(function(_, i) { return blobMap['shot' + i]; });
+    var promoBlob  = blobMap.promo;
+    // Cover art for File 3: reuse the canvas cover blob when available (avoids double fetch)
+    var boxartBlob = blobMap.cover || blobMap.boxart;
+    var shotBlobs  = shots.map(function(_, i) { return blobMap['shot' + i]; });
 
     // Both paths use explicit canvas compositing — drawing an SVG data URL to canvas
     // produces a blank/white image on iOS Safari when the SVG contains <image> elements.
@@ -1395,13 +1402,15 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
     if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
     if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);
 
+    // File layout: 1=thumbnail, 2=promo, 3=cover art (box art), 4-8=screenshots (max 5)
     if (useShareAPI) {
       var allFiles = [
-        new File([thumbBlob], gameName + '1.png', { type: 'image/png' }),
-        new File([promoBlob], gameName + '2.png', { type: 'image/png' })
+        new File([thumbBlob],  gameName + '1.png', { type: 'image/png' }),
+        new File([promoBlob],  gameName + '2.png', { type: 'image/png' }),
+        new File([boxartBlob], gameName + '3.' + (boxartBlob.type.includes('png') ? 'png' : 'jpg'), { type: boxartBlob.type })
       ].concat(shotBlobs.map(function(b, i) {
         var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
-        return new File([b], gameName + (i + 3) + ext, { type: b.type });
+        return new File([b], gameName + (i + 4) + ext, { type: b.type });
       }));
 
       try {
@@ -1414,9 +1423,11 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
       for (var i = shotBlobs.length - 1; i >= 0; i--) {
         var b = shotBlobs[i];
         var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
-        saveBlobAs(b, gameName + (i + 3) + ext);
+        saveBlobAs(b, gameName + (i + 4) + ext);
         await delay();
       }
+      saveBlobAs(boxartBlob, gameName + '3.' + (boxartBlob.type.includes('png') ? 'png' : 'jpg'));
+      await delay();
       saveBlobAs(promoBlob, gameName + '2.png');
       await delay();
       saveBlobAs(thumbBlob, gameName + '1.png');

@@ -1250,10 +1250,8 @@ el('thumbBtn').addEventListener('click', async function() {
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Worker error ' + res.status);
 
-    var thumbImg = el('thumbPreview');
-    thumbImg.src = data.thumbnailDataUrl;
-
-    // Decode SVG for client-side title editing
+    // Decode SVG and wait for the <img> to fully paint (cover JPEG inside SVG
+    // loads async; without waiting the card flashes a plain red background first).
     var svgBytes = atob(data.thumbnailDataUrl.split(',')[1]);
     var svgArr = new Uint8Array(svgBytes.length);
     for (var j = 0; j < svgBytes.length; j++) svgArr[j] = svgBytes.charCodeAt(j);
@@ -1272,6 +1270,12 @@ el('thumbBtn').addEventListener('click', async function() {
       });
     }
     el('thumbLinks').textContent = links;
+
+    var thumbImg = el('thumbPreview');
+    await new Promise(function(resolve) {
+      thumbImg.onload = resolve;
+      thumbImg.src = data.thumbnailDataUrl;
+    });
 
     el('thumbCard').style.display = 'block';
     btn.textContent = '✓ Done';

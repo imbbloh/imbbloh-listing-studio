@@ -1,6 +1,35 @@
 const express = require('express');
 const fs      = require('fs');
 const path    = require('path');
+const multer  = require('multer');
+
+// Telegram (GramJS) — loaded lazily so startup doesn't fail if env vars are absent
+let _TelegramClient = null, _StringSession = null, _TelegramApi = null;
+try {
+  _TelegramClient = require('telegram').TelegramClient;
+  _TelegramApi    = require('telegram').Api;
+  _StringSession  = require('telegram/sessions').StringSession;
+} catch (e) {
+  console.warn('telegram package unavailable — /telegram/send disabled');
+}
+
+let tgClient = null;
+
+async function getTelegramClient() {
+  const apiId   = parseInt(process.env.TELEGRAM_API_ID  || '0');
+  const apiHash = process.env.TELEGRAM_API_HASH || '';
+  const session = process.env.TELEGRAM_SESSION  || '';
+  if (!_TelegramClient) throw new Error('telegram package not installed — run npm install');
+  if (!apiId || !apiHash || !session) throw new Error('Telegram env vars not configured (TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION)');
+  if (tgClient && tgClient.connected) return tgClient;
+  if (!tgClient) {
+    tgClient = new _TelegramClient(new _StringSession(session), apiId, apiHash, { connectionRetries: 5 });
+  }
+  await tgClient.connect();
+  return tgClient;
+}
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 12 } });
 
 // Load static assets from disk once at startup — no CDN fetches, no 429 risk
 const FRAME_PNG    = fs.readFileSync(path.join(__dirname, 'assets/ns-template-frame.png'));
@@ -170,6 +199,55 @@ app.post('/', async (req, res) => {
     });
 
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Telegram send ──────────────────────────────────────────────────────────
+// Receives multipart/form-data with `price` (string) and `images[]` (files),
+// then sends them as a Telegram album to @CarousellOfficialBot via MTProto.
+app.post('/telegram/send', upload.array('images'), async (req, res) => {
+  try {
+    const price = (req.body.price || '').trim();
+    if (!price) return res.status(400).json({ error: 'Missing price' });
+    const files = req.files;
+    if (!files || !files.length) return res.status(400).json({ error: 'No images uploaded' });
+
+    const client = await getTelegramClient();
+    const Api    = _TelegramApi;
+
+    // Upload images to Telegram's servers sequentially (their API is stateful)
+    const inputFiles = [];
+    for (let i = 0; i < files.length; i++) {
+      const uploaded = await client.uploadFile({ file: files[i].buffer, workers: 1 });
+      inputFiles.push(uploaded);
+    }
+
+    const caption = `Shirt, M, $${price}`;
+    const peer    = await client.getInputEntity('@CarousellOfficialBot');
+
+    if (inputFiles.length === 1) {
+      await client.invoke(new Api.messages.SendMedia({
+        peer,
+        media:    new Api.InputMediaUploadedPhoto({ file: inputFiles[0] }),
+        message:  caption,
+        randomId: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
+      }));
+    } else {
+      await client.invoke(new Api.messages.SendMultiMedia({
+        peer,
+        multiMedia: inputFiles.map((f, i) => new Api.InputSingleMedia({
+          media:    new Api.InputMediaUploadedPhoto({ file: f }),
+          randomId: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
+          message:  i === 0 ? caption : '',
+          entities: [],
+        })),
+      }));
+    }
+
+    res.json({ ok: true, count: inputFiles.length });
+  } catch (err) {
+    console.error('[telegram/send]', err.message);
     res.status(500).json({ error: err.message });
   }
 });

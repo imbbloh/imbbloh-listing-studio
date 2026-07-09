@@ -1279,7 +1279,7 @@ el('thumbBtn').addEventListener('click', async function() {
       '\n\nPromo (File 2):\n' + THUMB_WORKER + '/promo-slide' +
       '\n\nCover Art (File 3):\n' + data.coverUrl;
     if (data.screenshotUrls && data.screenshotUrls.length > 1) {
-      data.screenshotUrls.slice(1, 6).forEach(function(url, i) {
+      data.screenshotUrls.slice(1, 8).forEach(function(url, i) {
         links += '\n\nScreenshot ' + (i + 1) + ' (File ' + (i + 4) + '):\n' + url;
       });
     }
@@ -1338,8 +1338,8 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
   }
 
   try {
-    // Limit to 5 screenshots so total = thumbnail + promo + cover art + 5 = 8 files max.
-    var shots = (curImageUrls.screenshotUrls || []).slice(1, 6);
+    // Limit to 7 screenshots so total = thumbnail + promo + cover art + 7 = 10 files max.
+    var shots = (curImageUrls.screenshotUrls || []).slice(1, 8);
     var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
     // Extract assets from the decoded SVG using indexOf/substring.

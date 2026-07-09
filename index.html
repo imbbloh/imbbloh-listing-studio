@@ -1143,10 +1143,17 @@ el('listBox').addEventListener('click', function(e) {
 var gagalinFontPromise = null;
 
 function loadGagalinFont() {
-  if (!gagalinFontPromise) {
-    gagalinFontPromise = new FontFace('Gagalin', 'url(' + THUMB_WORKER + '/font)')
-      .load().then(function(f) { document.fonts.add(f); });
+  if (gagalinFontPromise) return gagalinFontPromise;
+  // Extract font data URL from the SVG already in memory (same approach as cover/frame).
+  // This avoids a /font network fetch and guarantees the exact same OTF that rendered
+  // the SVG preview is used for the canvas text — no server dependency, no 404 risk.
+  var fontSrc = THUMB_WORKER + '/font'; // fallback if SVG not ready
+  if (curSvg) {
+    var m = curSvg.match(/src: url\('(data:font\/otf;base64,[^']+)'\)/);
+    if (m) fontSrc = m[1];
   }
+  gagalinFontPromise = new FontFace('Gagalin', 'url(' + fontSrc + ')')
+    .load().then(function(f) { document.fonts.add(f); });
   return gagalinFontPromise;
 }
 
@@ -1255,6 +1262,7 @@ el('thumbBtn').addEventListener('click', async function() {
     var svgArr = new Uint8Array(svgBytes.length);
     for (var j = 0; j < svgBytes.length; j++) svgArr[j] = svgBytes.charCodeAt(j);
     curSvg = new TextDecoder('utf-8').decode(svgArr);
+    gagalinFontPromise = null; // reset so loadGagalinFont() re-extracts from new SVG
     el('thumbTitle').value = gameTitle;
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };

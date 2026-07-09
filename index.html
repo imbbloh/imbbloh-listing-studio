@@ -1453,7 +1453,7 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
       }));
 
       try {
-        await navigator.share({ files: allFiles, title: gameName });
+        await navigator.share({ files: allFiles });
       } catch (shareErr) {
         if (shareErr.name !== 'AbortError') throw shareErr;
       }

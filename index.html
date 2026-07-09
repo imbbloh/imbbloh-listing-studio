@@ -1340,8 +1340,13 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
       // to produce a clean PNG without canvas-taint issues.
       var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
 
-      // Cover: use data URL returned directly by the server (avoids regex on large base64)
+      // Cover: prefer the clean base64 field from the server; fall back to
+      // regex extraction from curSvg for thumbnails generated before this deploy.
       var coverDataUrl = curCoverDataUrl;
+      if (!coverDataUrl && curSvg) {
+        var svgCoverMatch = curSvg.match(/href="(data:image\/jpeg;base64,[^"]+)"/);
+        if (svgCoverMatch) coverDataUrl = svgCoverMatch[1];
+      }
       if (!coverDataUrl) throw new Error('Thumbnail not generated yet — press Generate Thumbnail first');
 
       // Frame: extract from SVG in memory (static asset, always the same)

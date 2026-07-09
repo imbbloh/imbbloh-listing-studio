@@ -1338,64 +1338,64 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
 
   try {
     var shots = (curImageUrls.screenshotUrls || []).slice(1);
+    var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
+
+    // Extract assets from the decoded SVG using indexOf/substring.
+    // Regex can silently fail on iOS Safari when capture groups span 300-400 KB.
+    function extractSvgAsset(prefix, suffix) {
+      if (!curSvg) return null;
+      var s = curSvg.indexOf(prefix);
+      if (s === -1) return null;
+      s += prefix.length;
+      var e = curSvg.indexOf(suffix, s);
+      return e === -1 ? null : curSvg.substring(s, e);
+    }
+
+    // Cover: server JSON → SVG extraction → network fetch (never throws)
+    var coverJpegB64 = extractSvgAsset('href="data:image/jpeg;base64,', '"');
+    var coverDataUrl = curCoverDataUrl || (coverJpegB64 ? 'data:image/jpeg;base64,' + coverJpegB64 : null);
+
+    // Frame: SVG extraction → network fetch fallback
+    var framePngB64 = extractSvgAsset('href="data:image/png;base64,', '"');
+    var frameDataUrl = framePngB64 ? 'data:image/png;base64,' + framePngB64 : null;
+
+    // Single parallel fetch for anything missing from memory, plus promo and screenshots.
+    var fetchItems = [];
+    if (!coverDataUrl) fetchItems.push({ key: 'cover', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
+    if (!frameDataUrl) fetchItems.push({ key: 'frame', url: THUMB_WORKER + '/frame' });
+    fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/promo-slide' });
+    shots.forEach(function(u, i) {
+      fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
+    });
+
+    var fetchedBlobs = await Promise.all(fetchItems.map(function(item) {
+      return fetch(item.url).then(function(r) {
+        if (!r.ok) throw new Error(item.key + ' fetch failed: ' + r.status);
+        return r.blob();
+      });
+    }));
+
+    var blobMap = {};
+    fetchItems.forEach(function(item, i) { blobMap[item.key] = fetchedBlobs[i]; });
+
+    // Same-origin object URLs don't taint the canvas
+    var coverBlobUrl = blobMap.cover ? URL.createObjectURL(blobMap.cover) : null;
+    var frameBlobUrl = blobMap.frame ? URL.createObjectURL(blobMap.frame) : null;
+    if (coverBlobUrl) coverDataUrl = coverBlobUrl;
+    if (frameBlobUrl) frameDataUrl = frameBlobUrl;
+
+    var promoBlob = blobMap.promo;
+    var shotBlobs = shots.map(function(_, i) { return blobMap['shot' + i]; });
+
+    // Both paths use explicit canvas compositing — drawing an SVG data URL to canvas
+    // produces a blank/white image on iOS Safari when the SVG contains <image> elements.
+    try { await loadGagalinFont(); } catch (e) { /* fall back to system font */ }
+    var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl);
+
+    if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
+    if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);
 
     if (useShareAPI) {
-      var title = (el('thumbTitle').value || el('gameName').value.trim()).toUpperCase();
-
-      // Extract assets from the decoded SVG in memory using indexOf/substring.
-      // Regex can silently fail on iOS Safari when the capture group spans 300-400 KB.
-      function extractSvgAsset(prefix, suffix) {
-        if (!curSvg) return null;
-        var s = curSvg.indexOf(prefix);
-        if (s === -1) return null;
-        s += prefix.length;
-        var e = curSvg.indexOf(suffix, s);
-        return e === -1 ? null : curSvg.substring(s, e);
-      }
-
-      // Cover: server JSON field → SVG extraction → network fetch (never throws)
-      var coverJpegB64 = extractSvgAsset('href="data:image/jpeg;base64,', '"');
-      var coverDataUrl = curCoverDataUrl || (coverJpegB64 ? 'data:image/jpeg;base64,' + coverJpegB64 : null);
-
-      // Frame: SVG extraction → network fetch fallback
-      var framePngB64  = extractSvgAsset('href="data:image/png;base64,', '"');
-      var frameDataUrl = framePngB64 ? 'data:image/png;base64,' + framePngB64 : null;
-
-      // Build parallel fetch list — add cover/frame only when in-memory data is missing.
-      // Same-origin blob: URLs produced from these fetches do NOT taint the canvas.
-      var fetchItems = [];
-      if (!coverDataUrl) fetchItems.push({ key: 'cover', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
-      if (!frameDataUrl) fetchItems.push({ key: 'frame', url: THUMB_WORKER + '/frame' });
-      fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/promo-slide' });
-      shots.forEach(function(u, i) {
-        fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
-      });
-
-      var fetchedBlobs = await Promise.all(fetchItems.map(function(item) {
-        return fetch(item.url).then(function(r) {
-          if (!r.ok) throw new Error(item.key + ' fetch failed: ' + r.status);
-          return r.blob();
-        });
-      }));
-
-      var blobMap = {};
-      fetchItems.forEach(function(item, i) { blobMap[item.key] = fetchedBlobs[i]; });
-
-      // Convert network blobs to object URLs (same-origin → no canvas taint)
-      var coverBlobUrl = blobMap.cover ? URL.createObjectURL(blobMap.cover) : null;
-      var frameBlobUrl = blobMap.frame ? URL.createObjectURL(blobMap.frame) : null;
-      if (coverBlobUrl) coverDataUrl = coverBlobUrl;
-      if (frameBlobUrl) frameDataUrl = frameBlobUrl;
-
-      var promoBlob = blobMap.promo;
-      var shotBlobs  = shots.map(function(_, i) { return blobMap['shot' + i]; });
-
-      try { await loadGagalinFont(); } catch (e) { /* use system font */ }
-      var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl);
-
-      if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
-      if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);
-
       var allFiles = [
         new File([thumbBlob], gameName + '1.png', { type: 'image/png' }),
         new File([promoBlob], gameName + '2.png', { type: 'image/png' })
@@ -1404,44 +1404,12 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
         return new File([b], gameName + (i + 3) + ext, { type: b.type });
       }));
 
-      var shared = false;
       try {
         await navigator.share({ files: allFiles, title: gameName });
-        shared = true;
       } catch (shareErr) {
         if (shareErr.name !== 'AbortError') throw shareErr;
-        shared = true;
       }
-
-      if (!shared) {
-        allFiles.forEach(function(f) { window.open(URL.createObjectURL(f), '_blank'); });
-        showToast('Hold each image to save to Photos');
-      }
-
     } else {
-      // Desktop: render thumbnail from SVG preview, fetch remotes, save in reverse order
-      var canvas = document.createElement('canvas');
-      canvas.width = 1080; canvas.height = 1080;
-      var ctx = canvas.getContext('2d');
-      var image = new Image();
-      await new Promise(function(resolve) { image.onload = resolve; image.src = el('thumbPreview').src; });
-      ctx.drawImage(image, 0, 0, 1080, 1080);
-      var thumbBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
-
-      var remoteBlobs = await Promise.all(
-        [THUMB_WORKER + '/promo-slide'].concat(
-          shots.map(function(u) { return THUMB_WORKER + '/download?url=' + encodeURIComponent(u); })
-        ).map(function(url) {
-          return fetch(url).then(function(r) {
-            if (!r.ok) throw new Error('Fetch failed: ' + r.status);
-            return r.blob();
-          });
-        })
-      );
-
-      var promoBlob = remoteBlobs[0];
-      var shotBlobs = remoteBlobs.slice(1);
-
       var delay = function() { return new Promise(function(r) { setTimeout(r, 300); }); };
       for (var i = shotBlobs.length - 1; i >= 0; i--) {
         var b = shotBlobs[i];

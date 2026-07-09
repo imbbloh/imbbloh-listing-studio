@@ -204,8 +204,113 @@ app.post('/', async (req, res) => {
 });
 
 // ── Telegram send ──────────────────────────────────────────────────────────
-// Receives multipart/form-data with `price` (string) and `images[]` (files),
-// then sends them as a Telegram album to @CarousellOfficialBot via MTProto.
+// Two strategies tried in order:
+//   1. GramJS / MTProto  — requires TELEGRAM_SESSION (my.telegram.org credentials)
+//   2. Playwright        — requires TELEGRAM_WEB_SESSION (captured via setup-telegram-web.js)
+
+async function sendViaGramjs(price, files) {
+  const client = await getTelegramClient();
+  const Api    = _TelegramApi;
+
+  const inputFiles = [];
+  for (const f of files) {
+    inputFiles.push(await client.uploadFile({ file: f.buffer, workers: 1 }));
+  }
+
+  const caption = `Shirt, M, $${price}`;
+  const peer    = await client.getInputEntity('@CarousellOfficialBot');
+
+  if (inputFiles.length === 1) {
+    await client.invoke(new Api.messages.SendMedia({
+      peer,
+      media:    new Api.InputMediaUploadedPhoto({ file: inputFiles[0] }),
+      message:  caption,
+      randomId: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
+    }));
+  } else {
+    await client.invoke(new Api.messages.SendMultiMedia({
+      peer,
+      multiMedia: inputFiles.map((f, i) => new Api.InputSingleMedia({
+        media:    new Api.InputMediaUploadedPhoto({ file: f }),
+        randomId: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
+        message:  i === 0 ? caption : '',
+        entities: [],
+      })),
+    }));
+  }
+}
+
+async function sendViaPlaywright(price, files) {
+  const sessionB64 = process.env.TELEGRAM_WEB_SESSION;
+  if (!sessionB64) throw new Error('TELEGRAM_WEB_SESSION not set — run setup-telegram-web.js');
+
+  const { chromium } = require('playwright');
+  const storageState = JSON.parse(Buffer.from(sessionB64, 'base64').toString('utf-8'));
+
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote'],
+  });
+
+  try {
+    const context = await browser.newContext({ storageState });
+    const page    = await context.newPage();
+
+    // Open bot chat directly
+    await page.goto('https://web.telegram.org/k/#@CarousellOfficialBot', { timeout: 60000 });
+
+    // Confirm we are logged in (not on auth screen)
+    await page.waitForFunction(
+      () => !document.querySelector('.auth-form') && (document.querySelector('.chat-input') || document.querySelector('.bubbles')),
+      { timeout: 40000 }
+    );
+
+    // Find the hidden file input that Telegram Web always has in the DOM
+    const fileInput = await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15000 });
+
+    // Feed images as { name, mimeType, buffer } — no temp files needed
+    const inputFiles = files.map((f, i) => ({
+      name:     `image${i + 1}.${f.mimetype.includes('png') ? 'png' : 'jpg'}`,
+      mimeType: f.mimetype,
+      buffer:   f.buffer,
+    }));
+    await fileInput.setInputFiles(inputFiles);
+
+    // Wait for the send-photo popup to appear
+    const popup = await page.waitForSelector('.popup, .popup-container', { timeout: 20000 });
+
+    // Type caption — try several selector patterns Telegram Web uses
+    const captionSelectors = [
+      '.popup .input-field-input',
+      '.popup [contenteditable="true"]',
+      '.popup textarea',
+    ];
+    for (const sel of captionSelectors) {
+      const el = page.locator(sel).first();
+      if (await el.count() > 0) {
+        await el.click();
+        await el.fill(`Shirt, M, $${price}`);
+        break;
+      }
+    }
+
+    // Click Send (or fall back to Enter)
+    const sendSelectors = ['.popup .btn-primary', '.popup .btn-send', '.popup button[class*="send"]'];
+    let clicked = false;
+    for (const sel of sendSelectors) {
+      const el = page.locator(sel).first();
+      if (await el.count() > 0) { await el.click(); clicked = true; break; }
+    }
+    if (!clicked) await page.keyboard.press('Enter');
+
+    // Give Telegram time to upload and deliver
+    await page.waitForTimeout(6000);
+
+  } finally {
+    await browser.close();
+  }
+}
+
 app.post('/telegram/send', upload.array('images'), async (req, res) => {
   try {
     const price = (req.body.price || '').trim();
@@ -213,39 +318,14 @@ app.post('/telegram/send', upload.array('images'), async (req, res) => {
     const files = req.files;
     if (!files || !files.length) return res.status(400).json({ error: 'No images uploaded' });
 
-    const client = await getTelegramClient();
-    const Api    = _TelegramApi;
-
-    // Upload images to Telegram's servers sequentially (their API is stateful)
-    const inputFiles = [];
-    for (let i = 0; i < files.length; i++) {
-      const uploaded = await client.uploadFile({ file: files[i].buffer, workers: 1 });
-      inputFiles.push(uploaded);
-    }
-
-    const caption = `Shirt, M, $${price}`;
-    const peer    = await client.getInputEntity('@CarousellOfficialBot');
-
-    if (inputFiles.length === 1) {
-      await client.invoke(new Api.messages.SendMedia({
-        peer,
-        media:    new Api.InputMediaUploadedPhoto({ file: inputFiles[0] }),
-        message:  caption,
-        randomId: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
-      }));
+    // Prefer GramJS if configured; fall back to Playwright browser automation
+    if (process.env.TELEGRAM_SESSION && _TelegramClient) {
+      await sendViaGramjs(price, files);
     } else {
-      await client.invoke(new Api.messages.SendMultiMedia({
-        peer,
-        multiMedia: inputFiles.map((f, i) => new Api.InputSingleMedia({
-          media:    new Api.InputMediaUploadedPhoto({ file: f }),
-          randomId: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
-          message:  i === 0 ? caption : '',
-          entities: [],
-        })),
-      }));
+      await sendViaPlaywright(price, files);
     }
 
-    res.json({ ok: true, count: inputFiles.length });
+    res.json({ ok: true, count: files.length });
   } catch (err) {
     console.error('[telegram/send]', err.message);
     res.status(500).json({ error: err.message });

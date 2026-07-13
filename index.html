@@ -165,7 +165,6 @@ header {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); overflow: hidden;
   display: flex; flex-direction: column;
-  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: border-color .18s, transform .18s, box-shadow .18s;
 }
@@ -353,12 +352,13 @@ var SHEETS = [
 
 // Column keyword detection (case-insensitive substring match, first hit wins)
 var COL_KEYS = {
-  title:   ['game title', 'title', 'game name', 'game', 'name'],
-  normal:  ['normal price', 'normal version', 'normal', 'standard price', 'standard'],
-  premium: ['premium price', 'premium version', 'premium'],
-  price:   ['price', 'cost', 'amount'],
-  platform:['platform'],
-  url:     ['store url', 'official store', 'url', 'link', 'store'],
+  title:    ['game title', 'title', 'game name', 'game', 'name'],
+  normal:   ['normal price', 'normal version', 'normal', 'standard price', 'standard'],
+  premium:  ['premium price', 'premium version', 'premium'],
+  price:    ['price', 'cost', 'amount'],
+  platform: ['platform'],
+  url:      ['store url', 'official store', 'url', 'link', 'store'],
+  carousell:['carousell url', 'carousell', 'listing url', 'listing link', 'listing'],
 };
 
 // ── Image cache (localStorage) ──────────────────────────────────────────────
@@ -519,6 +519,7 @@ function loadSheet(tabName) {
             codePrice:    toPrice(get(row, idx.price)),
             platform:     String(get(row, idx.platform)).trim(),
             storeUrl:     String(get(row, idx.url)).trim(),
+            carousellUrl: String(get(row, idx.carousell)).trim(),
           };
         })
         .filter(function(g) { return g.title.length > 0; });
@@ -565,8 +566,10 @@ function platClass(g) {
 function makeCard(game) {
   var pc       = platClass(game);
   var platLbl  = (pc === 'code') ? 'Code' : (game.platform || (pc === 'ns' ? 'Nintendo' : pc === 'ps' ? 'PlayStation' : ''));
-  var rawUrl   = game.storeUrl || '';
-  var fullUrl  = rawUrl ? (rawUrl.startsWith('http') ? rawUrl : 'https://' + rawUrl) : '';
+  var rawUrl      = game.storeUrl || '';
+  var fullUrl     = rawUrl ? (rawUrl.startsWith('http') ? rawUrl : 'https://' + rawUrl) : '';
+  var rawCar      = game.carousellUrl || '';
+  var carousellUrl = rawCar ? (rawCar.startsWith('http') ? rawCar : 'https://' + rawCar) : '';
 
   var gradients = {
     ns:   'linear-gradient(135deg,#1a0005,#6e0010)',
@@ -580,9 +583,6 @@ function makeCard(game) {
   // ── card element ──
   var card = document.createElement('div');
   card.className = 'game-card';
-  if (fullUrl) {
-    card.addEventListener('click', function() { window.open(fullUrl, '_blank', 'noopener'); });
-  }
 
   // ── cover ──
   var coverWrap = document.createElement('div');
@@ -611,6 +611,12 @@ function makeCard(game) {
     strip.className = 'plat-strip ' + pc;
     strip.textContent = platLbl;
     coverWrap.appendChild(strip);
+  }
+
+  // Cover image click → Carousell listing
+  if (carousellUrl) {
+    coverWrap.style.cursor = 'pointer';
+    coverWrap.addEventListener('click', function() { window.open(carousellUrl, '_blank', 'noopener'); });
   }
 
   // Queue image load when this wrap scrolls into view

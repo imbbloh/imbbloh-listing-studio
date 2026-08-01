@@ -38,14 +38,15 @@ const PROMO_PNG    = fs.readFileSync(path.join(__dirname, 'assets/ns-promo-slide
 const FRAME_BASE64 = FRAME_PNG.toString('base64');
 const FONT_BASE64  = FONT_OTF.toString('base64');
 
-// PS frame — loaded gracefully so server starts even before the asset is committed
 let PS_FRAME_PNG = null, PS_FRAME_BASE64 = null;
 try {
   PS_FRAME_PNG    = fs.readFileSync(path.join(__dirname, 'assets/ps-template-frame.png'));
   PS_FRAME_BASE64 = PS_FRAME_PNG.toString('base64');
 } catch (e) {
-  console.warn('ps-template-frame.png not found — PS thumbnail will error until asset is added');
+  console.warn('ps-template-frame.png not found');
 }
+
+const PS_PROMO_PNG = fs.readFileSync(path.join(__dirname, 'assets/ps-promo-slide.png'));
 
 const CANVAS_W    = 1080;
 const CANVAS_H    = 1080;
@@ -186,6 +187,13 @@ app.get('/ps-frame', (req, res) => {
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.send(PS_FRAME_PNG);
+});
+
+app.get('/ps-promo-slide', (req, res) => {
+  const filename = req.query.filename ? decodeURIComponent(req.query.filename) + '.png' : 'ps-promo-slide.png';
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(PS_PROMO_PNG);
 });
 
 // ── Promo slide endpoint ───────────────────────────────────────────────────

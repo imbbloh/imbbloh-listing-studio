@@ -1380,7 +1380,8 @@ async function buildAllBlobs() {
   var fetchItems = [];
   if (needCoverFetch) fetchItems.push({ key: 'cover',  url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
   if (!frameDataUrl)  fetchItems.push({ key: 'frame',  url: THUMB_WORKER + '/frame' });
-  fetchItems.push(               { key: 'promo',  url: THUMB_WORKER + '/promo-slide' });
+  var promoSlideEndpoint = (platSel === 'ps45' || platSel === 'ps5') ? '/ps-promo-slide' : '/promo-slide';
+  fetchItems.push(               { key: 'promo',  url: THUMB_WORKER + promoSlideEndpoint });
   if (!needCoverFetch) fetchItems.push({ key: 'boxart', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
   shots.forEach(function(u, i) {
     fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });

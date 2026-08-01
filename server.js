@@ -130,9 +130,9 @@ function extractPsAssets(html) {
   const re = /https:\/\/gmedia\.playstation\.com\/[^"'\s<>\\]+/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
-    const url = m[0].split('?')[0].split('"')[0];
-    if (!url.includes('-screenshot-')) continue;
-    if (!seen.has(url)) { seen.add(url); screenshots.push(url); }
+    const baseUrl = m[0].split('?')[0].split('"')[0];
+    if (!baseUrl.includes('-screenshot-')) continue;
+    if (!seen.has(baseUrl)) { seen.add(baseUrl); screenshots.push(baseUrl + '?$1600px$'); }
     if (screenshots.length >= 7) break;
   }
   // Index 0 = cover art (mirrors NS structure the frontend expects)

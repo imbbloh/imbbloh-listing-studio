@@ -124,14 +124,13 @@ function extractPsAssets(html) {
 
   if (!coverUrl) throw new Error('Could not extract cover image from PlayStation store page');
 
-  // Collect gameplay screenshots: .jpg files from /vulcan/ap/rnd/ only.
-  // Skips .png marketing art, /grc/ rating icons, and the cover itself.
-  const seen = new Set([coverUrl]);
+  // Collect gameplay screenshots from gmedia.playstation.com (different CDN to cover art).
+  const seen = new Set();
   const screenshots = [];
-  const re = /https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>\\]+\.jpg/gi;
+  const re = /https:\/\/gmedia\.playstation\.com\/[^"'\s<>\\]+/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
-    const url = m[0].split('?')[0];
+    const url = m[0].split('?')[0].split('"')[0];
     if (!seen.has(url)) { seen.add(url); screenshots.push(url); }
     if (screenshots.length >= 7) break;
   }
@@ -276,7 +275,12 @@ app.get('/debug-ps', async (req, res) => {
       .map(m => m[0].split('"')[0])
       .filter(u => { if (seen.has(u)) return false; seen.add(u); return true; });
 
-    res.json({ ogImage, nextDataMedia, allUrls });
+    const seenG = new Set();
+    const gmediaUrls = [...html.matchAll(/https:\/\/gmedia\.playstation\.com\/[^"'\s<>\\]+/g)]
+      .map(m => m[0].split('"')[0].split('?')[0])
+      .filter(u => { if (seenG.has(u)) return false; seenG.add(u); return true; });
+
+    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

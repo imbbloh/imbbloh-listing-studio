@@ -246,6 +246,46 @@ app.get('/download', async (req, res) => {
   }
 });
 
+app.get('/debug-ps', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'Missing url param' });
+  try {
+    const storePage = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' }
+    });
+    if (!storePage.ok) return res.status(500).json({ error: 'Fetch failed: ' + storePage.status });
+    const html = await storePage.text();
+
+    // og:image
+    const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+                  || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+    const ogImage = ogMatch ? ogMatch[1] : null;
+
+    // __NEXT_DATA__ media
+    let nextDataMedia = null;
+    const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (nextMatch) {
+      try {
+        const data = JSON.parse(nextMatch[1]);
+        const product = data?.props?.pageProps?.data?.product
+                     || data?.props?.pageProps?.product;
+        nextDataMedia = product?.media || null;
+        if (!nextDataMedia) nextDataMedia = { note: 'no media array found', keys: Object.keys(product || {}) };
+      } catch (e) { nextDataMedia = { error: e.message }; }
+    }
+
+    // All PS CDN image URLs
+    const seen = new Set();
+    const allUrls = [...html.matchAll(/https:\/\/image\.api\.playstation\.com\/[^"'\s<>\\]+/g)]
+      .map(m => m[0].split('"')[0])
+      .filter(u => { if (seen.has(u)) return false; seen.add(u); return true; });
+
+    res.json({ ogImage, nextDataMedia, allUrls });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/', async (req, res) => {
   const { storeUrl, gameTitle } = req.body || {};
   if (!storeUrl || !gameTitle) {

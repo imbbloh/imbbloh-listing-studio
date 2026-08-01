@@ -219,10 +219,6 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
   font-size: 0.75rem; line-height: 1.75;
   white-space: pre-wrap; word-break: break-word;
   max-height: 320px; overflow-y: auto;
-  outline: none;
-}
-.output-text:focus {
-  box-shadow: inset 0 0 0 1px var(--green);
 }
 
 .sync-row {
@@ -506,7 +502,7 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
   <!-- Output -->
   <div class="output-card" id="outputCard">
     <div class="output-topbar">Generated Copy</div>
-    <div class="output-text" id="outputText" contenteditable="true" spellcheck="false"></div>
+    <div class="output-text" id="outputText"></div>
     <div class="sync-row" id="syncRow">
       <div class="sync-dot"></div>
       <span id="syncMsg"></span>
@@ -877,13 +873,9 @@ function genCode(name) {
 }
 
 // ── Show output ────────────────────────────────────────────────────────────
-function getEditedCopy() {
-  return el('outputText').innerText || curCopy;
-}
-
 function showOutput(txt) {
   curCopy = txt;
-  el('outputText').innerText = txt;
+  el('outputText').textContent = txt;
   el('outputCard').classList.add('visible');
   el('syncRow').style.display = 'none';
   el('saveBtn').disabled = false;
@@ -946,9 +938,8 @@ function showOutput(txt) {
 
 // ── Copy ───────────────────────────────────────────────────────────────────
 function doCopy() {
-  var txt = getEditedCopy();
-  if (!txt) return;
-  navigator.clipboard.writeText(txt).then(function() {
+  if (!curCopy) return;
+  navigator.clipboard.writeText(curCopy).then(function() {
     el('copyBtn').textContent = '\u2713 Copied!';
     showToast('Copied!');
     setTimeout(function() { el('copyBtn').textContent = '\u2398 Copy'; }, 2000);
@@ -958,7 +949,7 @@ function doCopy() {
 // ── Save to Sheets ─────────────────────────────────────────────────────────
 function doSave() {
   var name = cleanTitle(el('gameName').value.trim());
-  if (!getEditedCopy()) return;
+  if (!curCopy) return;
 
   el('saveBtn').disabled = true;
   el('saveBtn').textContent = 'Saving...';
@@ -999,7 +990,7 @@ function doSave() {
       np:       isCode ? null : parseFloat(el('normalPrice').value),
       pp:       isCode ? null : parseFloat(el('premiumPrice').value),
       cp:       isCode ? parseFloat(el('codePrice').value) : null,
-      copy:     getEditedCopy(),
+      copy:     curCopy,
       date:     new Date().toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })
     };
 

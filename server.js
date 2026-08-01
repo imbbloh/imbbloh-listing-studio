@@ -57,22 +57,6 @@ const COVER_Y_PS  = 295;
 const COVER_H_PS  = 640;
 const TITLE_Y_PS  = 1008;
 
-// In-memory cache: storeUrl → { coverUrl, coverBase64, screenshotUrls }
-// Skips store page + cover image fetch on repeat generations (same URL within TTL).
-const genCache = new Map();
-const CACHE_TTL = 60 * 60 * 1000; // 1 hour
-const CACHE_MAX = 50;
-function cacheGet(url) {
-  const e = genCache.get(url);
-  if (!e || Date.now() - e.ts > CACHE_TTL) { genCache.delete(url); return null; }
-  return e;
-}
-function cacheSet(url, data) {
-  if (genCache.size >= CACHE_MAX) {
-    genCache.delete(genCache.keys().next().value); // evict oldest
-  }
-  genCache.set(url, { ...data, ts: Date.now() });
-}
 
 function titleFontSize(title) {
   const n = title.length;
@@ -319,17 +303,6 @@ app.post('/', async (req, res) => {
     const fullUrl = storeUrl.startsWith('http') ? storeUrl : 'https://' + storeUrl;
     const isPS    = fullUrl.includes('playstation.com');
 
-    // Check cache first — skip all network fetches on hit
-    const cached = cacheGet(fullUrl);
-    if (cached) {
-      console.log('[cache hit]', fullUrl);
-      const svg = isPS
-        ? buildPsThumbnailSvg(gameTitle, cached.coverBase64, PS_FRAME_BASE64, FONT_BASE64)
-        : buildThumbnailSvg(gameTitle, cached.coverBase64, FRAME_BASE64, FONT_BASE64);
-      const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
-      return res.json({ thumbnailDataUrl, coverBase64: cached.coverBase64, coverUrl: cached.coverUrl, screenshotUrls: cached.screenshotUrls });
-    }
-
     const storePage = await fetch(fullUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' }
     });
@@ -343,7 +316,6 @@ app.post('/', async (req, res) => {
       const imgRes = await fetch(coverUrl);
       if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);
       const coverBase64 = toBase64(await imgRes.arrayBuffer());
-      cacheSet(fullUrl, { coverUrl, coverBase64, screenshotUrls });
       const svg = buildPsThumbnailSvg(gameTitle, coverBase64, PS_FRAME_BASE64, FONT_BASE64);
       const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
       return res.json({ thumbnailDataUrl, coverBase64, coverUrl, screenshotUrls });
@@ -356,7 +328,6 @@ app.post('/', async (req, res) => {
     if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);
 
     const coverBase64 = toBase64(await imgRes.arrayBuffer());
-    cacheSet(fullUrl, { coverUrl: cdn.coverUrl, coverBase64, screenshotUrls: cdn.screenshotUrls });
     const svg = buildThumbnailSvg(gameTitle, coverBase64, FRAME_BASE64, FONT_BASE64);
     const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
 

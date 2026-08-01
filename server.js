@@ -281,7 +281,12 @@ app.get('/debug-ps', async (req, res) => {
       .map(m => m[0].split('"')[0].split('?')[0])
       .filter(u => { if (seenG.has(u)) return false; seenG.add(u); return true; });
 
-    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls });
+    const screenshotsUsed = gmediaUrls
+      .filter(u => u.includes('-screenshot-'))
+      .slice(0, 7)
+      .map(u => u + '?$1600px$');
+
+    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

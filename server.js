@@ -124,13 +124,14 @@ function extractPsAssets(html) {
 
   if (!coverUrl) throw new Error('Could not extract cover image from PlayStation store page');
 
-  // Collect gameplay screenshots from gmedia.playstation.com (different CDN to cover art).
+  // Collect gameplay screenshots: gmedia.playstation.com URLs containing "-screenshot-".
   const seen = new Set();
   const screenshots = [];
   const re = /https:\/\/gmedia\.playstation\.com\/[^"'\s<>\\]+/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
     const url = m[0].split('?')[0].split('"')[0];
+    if (!url.includes('-screenshot-')) continue;
     if (!seen.has(url)) { seen.add(url); screenshots.push(url); }
     if (screenshots.length >= 7) break;
   }

@@ -106,9 +106,29 @@ function extractNintendoAssets(html) {
 }
 
 function extractPsAssets(html) {
-  const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
-                || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
-  const coverUrl = ogMatch ? ogMatch[1] : null;
+  // Try to get portrait cover from __NEXT_DATA__ (Next.js embedded product JSON)
+  let coverUrl = null;
+  const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (nextDataMatch) {
+    try {
+      const data = JSON.parse(nextDataMatch[1]);
+      // PlayStation store embeds media array with role-tagged images
+      const media = data?.props?.pageProps?.data?.product?.media
+                 || data?.props?.pageProps?.product?.media
+                 || [];
+      const PORTRAIT_ROLES = ['PORTRAIT', 'GAMEHUB_COVER_ART', 'PACKAGE_IMAGE'];
+      const portrait = media.find(m => PORTRAIT_ROLES.includes(m.role) && m.url);
+      if (portrait) coverUrl = portrait.url;
+    } catch (e) { /* ignore parse errors, fall through */ }
+  }
+
+  // Fall back to og:image
+  if (!coverUrl) {
+    const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+                  || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+    coverUrl = ogMatch ? ogMatch[1] : null;
+  }
+
   if (!coverUrl) throw new Error('Could not extract cover image from PlayStation store page');
 
   const seen = new Set([coverUrl]);
@@ -245,6 +265,7 @@ app.post('/', async (req, res) => {
     if (isPS) {
       if (!PS_FRAME_BASE64) throw new Error('PS frame asset not found — commit assets/ps-template-frame.png to the repo');
       const { coverUrl, screenshotUrls } = extractPsAssets(html);
+      console.log('[PS] coverUrl:', coverUrl);
       const imgRes = await fetch(coverUrl);
       if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);
       const coverBase64 = toBase64(await imgRes.arrayBuffer());

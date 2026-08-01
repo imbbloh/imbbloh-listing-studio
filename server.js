@@ -144,7 +144,7 @@ function buildPsThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
     <style>@font-face { font-family: 'Gagalin'; src: url('data:font/otf;base64,${fontBase64}'); }</style>
   </defs>
   <rect width="${CANVAS_W}" height="${CANVAS_H}" fill="#000000"/>
-  <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}" preserveAspectRatio="xMidYMid slice"/>
+  <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="${COVER_Y_PS}" width="${CANVAS_W}" height="${COVER_H_PS}" preserveAspectRatio="xMidYMid slice"/>
   <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}"/>
   <text x="${CANVAS_W / 2}" y="${TITLE_Y_PS}" fill="white" font-size="${fontSize}" font-family="Gagalin,Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle" letter-spacing="3">${title}</text>
 </svg>`;

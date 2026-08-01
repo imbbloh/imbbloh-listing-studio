@@ -106,21 +106,14 @@ function extractNintendoAssets(html) {
 }
 
 function extractPsAssets(html) {
-  // Try to get portrait cover from __NEXT_DATA__ (Next.js embedded product JSON)
+  // The portrait cover image appears in the page as a .jpg with a ?w=54&thumb=true
+  // thumbnail variant immediately following it (in the edition selector section).
+  // Matching the thumb variant and capturing the base URL is the most reliable signal.
   let coverUrl = null;
-  const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-  if (nextDataMatch) {
-    try {
-      const data = JSON.parse(nextDataMatch[1]);
-      // PlayStation store embeds media array with role-tagged images
-      const media = data?.props?.pageProps?.data?.product?.media
-                 || data?.props?.pageProps?.product?.media
-                 || [];
-      const PORTRAIT_ROLES = ['PORTRAIT', 'GAMEHUB_COVER_ART', 'PACKAGE_IMAGE'];
-      const portrait = media.find(m => PORTRAIT_ROLES.includes(m.role) && m.url);
-      if (portrait) coverUrl = portrait.url;
-    } catch (e) { /* ignore parse errors, fall through */ }
-  }
+  const thumbRef = html.match(
+    /(https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'<>\s?]+\.jpg)\?[^"'<>\s]*thumb/i
+  );
+  if (thumbRef) coverUrl = thumbRef[1];
 
   // Fall back to og:image
   if (!coverUrl) {
@@ -136,7 +129,7 @@ function extractPsAssets(html) {
   const re = /https:\/\/image\.api\.playstation\.com\/[^"'\s<>\\]+/g;
   let m;
   while ((m = re.exec(html)) !== null) {
-    const url = m[0].split('"')[0].split("'")[0];
+    const url = m[0].split('"')[0].split("'")[0].split('?')[0];
     if (!seen.has(url)) { seen.add(url); screenshotUrls.push(url); }
     if (screenshotUrls.length >= 8) break;
   }

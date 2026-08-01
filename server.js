@@ -124,16 +124,19 @@ function extractPsAssets(html) {
 
   if (!coverUrl) throw new Error('Could not extract cover image from PlayStation store page');
 
+  // Collect gameplay screenshots: .jpg files from /vulcan/ap/rnd/ only.
+  // Skips .png marketing art, /grc/ rating icons, and the cover itself.
   const seen = new Set([coverUrl]);
-  const screenshotUrls = [];
-  const re = /https:\/\/image\.api\.playstation\.com\/[^"'\s<>\\]+/g;
+  const screenshots = [];
+  const re = /https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>\\]+\.jpg/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
-    const url = m[0].split('"')[0].split("'")[0].split('?')[0];
-    if (!seen.has(url)) { seen.add(url); screenshotUrls.push(url); }
-    if (screenshotUrls.length >= 8) break;
+    const url = m[0].split('?')[0];
+    if (!seen.has(url)) { seen.add(url); screenshots.push(url); }
+    if (screenshots.length >= 7) break;
   }
-  return { coverUrl, screenshotUrls };
+  // Index 0 = cover art (mirrors NS structure the frontend expects)
+  return { coverUrl, screenshotUrls: [coverUrl, ...screenshots] };
 }
 
 function buildPsThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {

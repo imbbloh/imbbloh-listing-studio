@@ -881,9 +881,9 @@ function showOutput(txt) {
   el('saveBtn').disabled = false;
   el('saveBtn').textContent = '\u2191 Save to Sheets';
 
-  // Thumbnail button \u2014 NS game mode only
-  var isNS = appMode === 'game' && (platSel === 'ns12' || platSel === 'ns2');
-  el('thumbBtnWrap').style.display = isNS ? 'block' : 'none';
+  // Thumbnail button \u2014 NS and PS game mode
+  var showThumb = appMode === 'game' && (platSel === 'ns12' || platSel === 'ns2' || platSel === 'ps45' || platSel === 'ps5');
+  el('thumbBtnWrap').style.display = showThumb ? 'block' : 'none';
   el('thumbBtn').disabled = false;
   el('thumbBtn').textContent = '\ud83d\uddbc\ufe0f Generate Thumbnail';
   el('thumbCard').style.display = 'none';
@@ -1176,12 +1176,12 @@ function loadGagalinFont() {
 // Renders a 1080×1080 thumbnail PNG from data URLs already in memory.
 // Data URLs don't taint the canvas (unlike cross-origin image src), so
 // toBlob() works correctly on iOS Safari.
-async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl) {
+async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
   var canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1080;
   var ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#e8001d';
+  ctx.fillStyle = bgColor || '#e8001d';
   ctx.fillRect(0, 0, 1080, 1080);
 
   var coverImg = new Image();
@@ -1248,7 +1248,7 @@ el('thumbTitle').addEventListener('input', function() {
 });
 
 // ── Thumbnail generation ───────────────────────────────────────────────────
-var THUMB_WORKER = 'https://imbbloh-listing-studio-81cj.onrender.com';
+var THUMB_WORKER = 'https://imbbloh-listing-studio.onrender.com';
 
 el('thumbBtn').addEventListener('click', async function() {
   var btn = el('thumbBtn');
@@ -1285,9 +1285,11 @@ el('thumbBtn').addEventListener('click', async function() {
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };
 
     // Build copy links: File 1 (thumbnail), File 2 (promo), File 3 (cover art), Files 4-8 (screenshots)
+    var isPS = platSel === 'ps45' || platSel === 'ps5';
+    var promoEndpoint = isPS ? '/ps-promo-slide' : '/promo-slide';
     var links =
       'Thumbnail (File 1): [generated — use downloaded file]' +
-      '\n\nPromo (File 2):\n' + THUMB_WORKER + '/promo-slide' +
+      '\n\nPromo (File 2):\n' + THUMB_WORKER + promoEndpoint +
       '\n\nCover Art (File 3):\n' + data.coverUrl;
     if (data.screenshotUrls && data.screenshotUrls.length > 1) {
       data.screenshotUrls.slice(1, 8).forEach(function(url, i) {
@@ -1378,7 +1380,8 @@ async function buildAllBlobs() {
   var fetchItems = [];
   if (needCoverFetch) fetchItems.push({ key: 'cover',  url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
   if (!frameDataUrl)  fetchItems.push({ key: 'frame',  url: THUMB_WORKER + '/frame' });
-  fetchItems.push(               { key: 'promo',  url: THUMB_WORKER + '/promo-slide' });
+  var promoSlideEndpoint = (platSel === 'ps45' || platSel === 'ps5') ? '/ps-promo-slide' : '/promo-slide';
+  fetchItems.push(               { key: 'promo',  url: THUMB_WORKER + promoSlideEndpoint });
   if (!needCoverFetch) fetchItems.push({ key: 'boxart', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
   shots.forEach(function(u, i) {
     fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
@@ -1411,7 +1414,8 @@ async function buildAllBlobs() {
   }
 
   try { await loadGagalinFont(); } catch (e) { /* fall back to system font */ }
-  var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl);
+  var isPS = platSel === 'ps45' || platSel === 'ps5';
+  var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl, isPS ? '#000000' : '#e8001d');
 
   if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
   if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);

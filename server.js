@@ -318,7 +318,7 @@ app.post('/', async (req, res) => {
       const coverBase64 = toBase64(await imgRes.arrayBuffer());
       const svg = buildPsThumbnailSvg(gameTitle, coverBase64, PS_FRAME_BASE64, FONT_BASE64);
       const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
-      return res.json({ thumbnailDataUrl, coverBase64, coverUrl, screenshotUrls });
+      return res.json({ thumbnailDataUrl, coverUrl, screenshotUrls });
     }
 
     const { platform, nsuid, hashes } = extractNintendoAssets(html);
@@ -331,7 +331,7 @@ app.post('/', async (req, res) => {
     const svg = buildThumbnailSvg(gameTitle, coverBase64, FRAME_BASE64, FONT_BASE64);
     const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
 
-    res.json({ thumbnailDataUrl, coverBase64, coverUrl: cdn.coverUrl, screenshotUrls: cdn.screenshotUrls });
+    res.json({ thumbnailDataUrl, coverUrl: cdn.coverUrl, screenshotUrls: cdn.screenshotUrls });
 
   } catch (err) {
     res.status(500).json({ error: err.message });

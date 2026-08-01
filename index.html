@@ -1250,6 +1250,9 @@ el('thumbTitle').addEventListener('input', function() {
 // ── Thumbnail generation ───────────────────────────────────────────────────
 var THUMB_WORKER = 'https://imbbloh-listing-studio.onrender.com';
 
+// Pre-warm Render so it's not cold when Generate Thumbnail is clicked.
+fetch(THUMB_WORKER + '/health').catch(function() {});
+
 el('thumbBtn').addEventListener('click', async function() {
   var btn = el('thumbBtn');
   var storeUrl = el('storeUrl').value.trim();
@@ -1279,7 +1282,7 @@ el('thumbBtn').addEventListener('click', async function() {
     for (var j = 0; j < svgBytes.length; j++) svgArr[j] = svgBytes.charCodeAt(j);
     curSvg = new TextDecoder('utf-8').decode(svgArr);
     gagalinFontPromise = null; // reset so loadGagalinFont() re-extracts from new SVG
-    curCoverDataUrl = data.coverBase64 ? 'data:image/jpeg;base64,' + data.coverBase64 : null;
+    curCoverDataUrl = null; // extracted from SVG by buildAllBlobs when needed
     el('thumbTitle').value = gameTitle;
 
     curImageUrls = { coverUrl: data.coverUrl, screenshotUrls: data.screenshotUrls || [] };

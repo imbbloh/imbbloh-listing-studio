@@ -38,11 +38,23 @@ const PROMO_PNG    = fs.readFileSync(path.join(__dirname, 'assets/ns-promo-slide
 const FRAME_BASE64 = FRAME_PNG.toString('base64');
 const FONT_BASE64  = FONT_OTF.toString('base64');
 
-const CANVAS_W  = 1080;
-const CANVAS_H  = 1080;
-const COVER_Y   = 295;
-const COVER_H   = 640;
-const TITLE_Y   = 1008;
+// PS frame — loaded gracefully so server starts even before the asset is committed
+let PS_FRAME_PNG = null, PS_FRAME_BASE64 = null;
+try {
+  PS_FRAME_PNG    = fs.readFileSync(path.join(__dirname, 'assets/ps-template-frame.png'));
+  PS_FRAME_BASE64 = PS_FRAME_PNG.toString('base64');
+} catch (e) {
+  console.warn('ps-template-frame.png not found — PS thumbnail will error until asset is added');
+}
+
+const CANVAS_W    = 1080;
+const CANVAS_H    = 1080;
+const COVER_Y     = 295;
+const COVER_H     = 640;
+const TITLE_Y     = 1008;
+const COVER_Y_PS  = 330;
+const COVER_H_PS  = 650;
+const TITLE_Y_PS  = 1038;
 
 function titleFontSize(title) {
   const n = title.length;
@@ -92,6 +104,38 @@ function extractNintendoAssets(html) {
   return { platform, nsuid, hashes };
 }
 
+function extractPsAssets(html) {
+  const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+                || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+  const coverUrl = ogMatch ? ogMatch[1] : null;
+  if (!coverUrl) throw new Error('Could not extract cover image from PlayStation store page');
+
+  const seen = new Set([coverUrl]);
+  const screenshotUrls = [];
+  const re = /https:\/\/image\.api\.playstation\.com\/[^"'\s<>\\]+/g;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const url = m[0].split('"')[0].split("'")[0];
+    if (!seen.has(url)) { seen.add(url); screenshotUrls.push(url); }
+    if (screenshotUrls.length >= 8) break;
+  }
+  return { coverUrl, screenshotUrls };
+}
+
+function buildPsThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
+  const fontSize = titleFontSize(gameTitle);
+  const title    = escapeXml(gameTitle.toUpperCase());
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+  <defs>
+    <style>@font-face { font-family: 'Gagalin'; src: url('data:font/otf;base64,${fontBase64}'); }</style>
+  </defs>
+  <rect width="${CANVAS_W}" height="${CANVAS_H}" fill="#016fce"/>
+  <image href="data:image/jpeg;base64,${coverBase64}" x="0" y="${COVER_Y_PS}" width="${CANVAS_W}" height="${COVER_H_PS}" preserveAspectRatio="xMidYMid slice"/>
+  <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}"/>
+  <text x="${CANVAS_W / 2}" y="${TITLE_Y_PS}" fill="white" font-size="${fontSize}" font-family="Gagalin,Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle" letter-spacing="3">${title}</text>
+</svg>`;
+}
+
 function buildCdnUrls(platform, nsuid, hashes) {
   const base     = 'https://assets.nintendo.com/image/upload';
   const mainPath = `store/software/${platform}/${nsuid}/${hashes[0]}`;
@@ -137,6 +181,13 @@ app.get('/font', (req, res) => {
   res.send(FONT_OTF);
 });
 
+app.get('/ps-frame', (req, res) => {
+  if (!PS_FRAME_PNG) return res.status(404).json({ error: 'ps-template-frame.png not found' });
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(PS_FRAME_PNG);
+});
+
 // ── Promo slide endpoint ───────────────────────────────────────────────────
 // Serves ns-promo-slide.png from memory (loaded at startup) so the frontend
 // can download it via the same /download flow without hitting any CDN.
@@ -175,11 +226,24 @@ app.post('/', async (req, res) => {
 
   try {
     const fullUrl = storeUrl.startsWith('http') ? storeUrl : 'https://' + storeUrl;
+    const isPS    = fullUrl.includes('playstation.com');
+
     const storePage = await fetch(fullUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; imbbloh-bot/1.0)' }
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' }
     });
     if (!storePage.ok) throw new Error('Store page fetch failed: ' + storePage.status);
     const html = await storePage.text();
+
+    if (isPS) {
+      if (!PS_FRAME_BASE64) throw new Error('PS frame asset not found — commit assets/ps-template-frame.png to the repo');
+      const { coverUrl, screenshotUrls } = extractPsAssets(html);
+      const imgRes = await fetch(coverUrl);
+      if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);
+      const coverBase64 = toBase64(await imgRes.arrayBuffer());
+      const svg = buildPsThumbnailSvg(gameTitle, coverBase64, PS_FRAME_BASE64, FONT_BASE64);
+      const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
+      return res.json({ thumbnailDataUrl, coverBase64, coverUrl, screenshotUrls });
+    }
 
     const { platform, nsuid, hashes } = extractNintendoAssets(html);
     const cdn = buildCdnUrls(platform, nsuid, hashes);
@@ -191,12 +255,7 @@ app.post('/', async (req, res) => {
     const svg = buildThumbnailSvg(gameTitle, coverBase64, FRAME_BASE64, FONT_BASE64);
     const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
 
-    res.json({
-      thumbnailDataUrl,
-      coverBase64,
-      coverUrl:       cdn.coverUrl,
-      screenshotUrls: cdn.screenshotUrls
-    });
+    res.json({ thumbnailDataUrl, coverBase64, coverUrl: cdn.coverUrl, screenshotUrls: cdn.screenshotUrls });
 
   } catch (err) {
     res.status(500).json({ error: err.message });

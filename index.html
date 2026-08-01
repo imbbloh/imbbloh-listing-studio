@@ -881,9 +881,9 @@ function showOutput(txt) {
   el('saveBtn').disabled = false;
   el('saveBtn').textContent = '\u2191 Save to Sheets';
 
-  // Thumbnail button \u2014 NS game mode only
-  var isNS = appMode === 'game' && (platSel === 'ns12' || platSel === 'ns2');
-  el('thumbBtnWrap').style.display = isNS ? 'block' : 'none';
+  // Thumbnail button \u2014 NS and PS game mode
+  var showThumb = appMode === 'game' && (platSel === 'ns12' || platSel === 'ns2' || platSel === 'ps45' || platSel === 'ps5');
+  el('thumbBtnWrap').style.display = showThumb ? 'block' : 'none';
   el('thumbBtn').disabled = false;
   el('thumbBtn').textContent = '\ud83d\uddbc\ufe0f Generate Thumbnail';
   el('thumbCard').style.display = 'none';

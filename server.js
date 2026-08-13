@@ -48,6 +48,19 @@ try {
 
 const PS_PROMO_PNG = fs.readFileSync(path.join(__dirname, 'assets/ps-promo-slide.png'));
 
+const CODE_FRAME_PNG = { full: null, dlc: null, upgrade: null };
+const CODE_FRAME_B64 = { full: null, dlc: null, upgrade: null };
+const CODE_PROMO_PNG = { full: null, dlc: null, upgrade: null };
+['full', 'dlc', 'upgrade'].forEach(type => {
+  try {
+    CODE_FRAME_PNG[type] = fs.readFileSync(path.join(__dirname, `assets/code-${type}-frame.png`));
+    CODE_FRAME_B64[type] = CODE_FRAME_PNG[type].toString('base64');
+  } catch (e) { console.warn(`assets/code-${type}-frame.png not found`); }
+  try {
+    CODE_PROMO_PNG[type] = fs.readFileSync(path.join(__dirname, `assets/code-${type}-promo.png`));
+  } catch (e) { console.warn(`assets/code-${type}-promo.png not found`); }
+});
+
 const CANVAS_W    = 1080;
 const CANVAS_H    = 1080;
 const COVER_Y     = 295;
@@ -154,6 +167,18 @@ function buildPsThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
 </svg>`;
 }
 
+function buildCodeThumbnailSvg(gameTitle, frameBase64, fontBase64) {
+  const fontSize = titleFontSize(gameTitle);
+  const title    = escapeXml(gameTitle.toUpperCase());
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+  <defs>
+    <style>@font-face { font-family: 'Gagalin'; src: url('data:font/otf;base64,${fontBase64}'); }</style>
+  </defs>
+  <image href="data:image/png;base64,${frameBase64}" x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}"/>
+  <text x="${CANVAS_W / 2}" y="${TITLE_Y}" fill="white" font-size="${fontSize}" font-family="Gagalin,Arial,sans-serif" font-weight="900" text-anchor="middle" dominant-baseline="middle" letter-spacing="3">${title}</text>
+</svg>`;
+}
+
 function buildCdnUrls(platform, nsuid, hashes) {
   const base     = 'https://assets.nintendo.com/image/upload';
   const mainPath = `store/software/${platform}/${nsuid}/${hashes[0]}`;
@@ -204,6 +229,27 @@ app.get('/ps-frame', (req, res) => {
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.send(PS_FRAME_PNG);
+});
+
+app.get('/code-promo-slide', (req, res) => {
+  const type  = (req.query.type || 'full').toLowerCase();
+  const promo = CODE_PROMO_PNG[type];
+  if (!promo) return res.status(404).json({ error: `assets/code-${type}-promo.png not found — upload the file and redeploy` });
+  const filename = req.query.filename ? decodeURIComponent(req.query.filename) + '.png' : `code-${type}-promo.png`;
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(promo);
+});
+
+app.post('/code-thumb', (req, res) => {
+  const { gameTitle, codeSub } = req.body || {};
+  if (!gameTitle || !codeSub) return res.status(400).json({ error: 'Missing gameTitle or codeSub' });
+  const type    = codeSub.toLowerCase();
+  const frameB64 = CODE_FRAME_B64[type];
+  if (!frameB64) return res.status(404).json({ error: `assets/code-${type}-frame.png not found — upload the file and redeploy` });
+  const svg              = buildCodeThumbnailSvg(gameTitle, frameB64, FONT_BASE64);
+  const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
+  res.json({ thumbnailDataUrl });
 });
 
 app.get('/ps-promo-slide', (req, res) => {

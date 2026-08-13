@@ -881,8 +881,8 @@ function showOutput(txt) {
   el('saveBtn').disabled = false;
   el('saveBtn').textContent = '\u2191 Save to Sheets';
 
-  // Thumbnail button \u2014 NS and PS game mode
-  var showThumb = appMode === 'game' && (platSel === 'ns12' || platSel === 'ns2' || platSel === 'ps45' || platSel === 'ps5');
+  // Thumbnail button \u2014 game mode (NS/PS) or any code subtype
+  var showThumb = appMode === 'code' || (appMode === 'game' && (platSel === 'ns12' || platSel === 'ns2' || platSel === 'ps45' || platSel === 'ps5'));
   el('thumbBtnWrap').style.display = showThumb ? 'block' : 'none';
   el('thumbBtn').disabled = false;
   el('thumbBtn').textContent = '\ud83d\uddbc\ufe0f Generate Thumbnail';
@@ -1184,13 +1184,15 @@ async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
   ctx.fillStyle = bgColor || '#e8001d';
   ctx.fillRect(0, 0, 1080, 1080);
 
-  var coverImg = new Image();
-  await new Promise(function(resolve, reject) {
-    coverImg.onload = resolve;
-    coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
-    coverImg.src = coverDataUrl;
-  });
-  ctx.drawImage(coverImg, 0, 295, 1080, 640);
+  if (coverDataUrl) {
+    var coverImg = new Image();
+    await new Promise(function(resolve, reject) {
+      coverImg.onload = resolve;
+      coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
+      coverImg.src = coverDataUrl;
+    });
+    ctx.drawImage(coverImg, 0, 295, 1080, 640);
+  }
 
   var frameImg = new Image();
   await new Promise(function(resolve, reject) {
@@ -1255,15 +1257,59 @@ fetch(THUMB_WORKER + '/health').catch(function() {});
 
 el('thumbBtn').addEventListener('click', async function() {
   var btn = el('thumbBtn');
-  var storeUrl = el('storeUrl').value.trim();
   var gameTitle = el('gameName').value.trim();
-
-  if (!storeUrl) { showToast('Store URL missing — generate listing first', true); return; }
   if (!gameTitle) { showToast('No game title', true); return; }
 
   btn.disabled = true;
   btn.textContent = 'Generating…';
   el('thumbCard').style.display = 'none';
+
+  // ── Code mode: no store URL, no cover scraping ─────────────────────────
+  if (appMode === 'code') {
+    try {
+      var codeRes = await fetch(THUMB_WORKER + '/code-thumb', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameTitle: gameTitle, codeSub: codeSub })
+      });
+      var codeData = await codeRes.json();
+      if (!codeRes.ok) throw new Error(codeData.error || 'Worker error ' + codeRes.status);
+
+      var cSvgBytes = atob(codeData.thumbnailDataUrl.split(',')[1]);
+      var cSvgArr = new Uint8Array(cSvgBytes.length);
+      for (var ci = 0; ci < cSvgBytes.length; ci++) cSvgArr[ci] = cSvgBytes.charCodeAt(ci);
+      curSvg = new TextDecoder('utf-8').decode(cSvgArr);
+      gagalinFontPromise = null;
+      curCoverDataUrl = null;
+      el('thumbTitle').value = gameTitle;
+      curImageUrls = { coverUrl: null, screenshotUrls: [] };
+
+      el('thumbLinks').textContent =
+        'Thumbnail (File 1): [generated — use downloaded file]' +
+        '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?type=' + codeSub;
+
+      var cThumbImg = el('thumbPreview');
+      await new Promise(function(resolve) { cThumbImg.onload = resolve; cThumbImg.src = codeData.thumbnailDataUrl; });
+      el('thumbCard').style.display = 'block';
+      btn.textContent = '✓ Done';
+      showToast('Thumbnail ready!');
+      setTimeout(function() { el('thumbCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = '🖼️ Generate Thumbnail';
+      showToast(e.message || 'Thumbnail failed', true);
+    }
+    return;
+  }
+
+  // ── Game mode: scrape store page ────────────────────────────────────────
+  var storeUrl = el('storeUrl').value.trim();
+  if (!storeUrl) {
+    btn.disabled = false;
+    btn.textContent = '🖼️ Generate Thumbnail';
+    showToast('Store URL missing — generate listing first', true);
+    return;
+  }
 
   try {
     var res = await fetch(THUMB_WORKER, {
@@ -1379,16 +1425,26 @@ async function buildAllBlobs() {
   var framePngB64  = extractSvgAsset('href="data:image/png;base64,', '"');
   var frameDataUrl = framePngB64 ? 'data:image/png;base64,' + framePngB64 : null;
 
-  var needCoverFetch = !coverDataUrl;
+  var isCodeMode = appMode === 'code';
+  var needCoverFetch = !coverDataUrl && !isCodeMode;
   var fetchItems = [];
   if (needCoverFetch) fetchItems.push({ key: 'cover',  url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
   if (!frameDataUrl)  fetchItems.push({ key: 'frame',  url: THUMB_WORKER + '/frame' });
-  var promoSlideEndpoint = (platSel === 'ps45' || platSel === 'ps5') ? '/ps-promo-slide' : '/promo-slide';
-  fetchItems.push(               { key: 'promo',  url: THUMB_WORKER + promoSlideEndpoint });
-  if (!needCoverFetch) fetchItems.push({ key: 'boxart', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
-  shots.forEach(function(u, i) {
-    fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
-  });
+  var promoSlideEndpoint;
+  if (isCodeMode) {
+    promoSlideEndpoint = '/code-promo-slide?type=' + codeSub;
+  } else if (platSel === 'ps45' || platSel === 'ps5') {
+    promoSlideEndpoint = '/ps-promo-slide';
+  } else {
+    promoSlideEndpoint = '/promo-slide';
+  }
+  fetchItems.push({ key: 'promo', url: THUMB_WORKER + promoSlideEndpoint });
+  if (!needCoverFetch && !isCodeMode) fetchItems.push({ key: 'boxart', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
+  if (!isCodeMode) {
+    shots.forEach(function(u, i) {
+      fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
+    });
+  }
 
   var fetchedBlobs = await Promise.all(fetchItems.map(function(item) {
     return fetch(item.url).then(function(r) {
@@ -1407,8 +1463,8 @@ async function buildAllBlobs() {
   if (frameBlobUrl) frameDataUrl = frameBlobUrl;
 
   var promoBlob    = blobMap.promo;
-  var boxartBlob   = blobMap.cover || blobMap.boxart;
-  var rawShotBlobs = shots.map(function(_, i) { return blobMap['shot' + i]; });
+  var boxartBlob   = isCodeMode ? null : (blobMap.cover || blobMap.boxart || null);
+  var rawShotBlobs = isCodeMode ? [] : shots.map(function(_, i) { return blobMap['shot' + i]; });
   var shotBlobs    = [];
   for (var si = 0; si < rawShotBlobs.length; si++) {
     if (rawShotBlobs[si] && !(await isMostlyWhite(rawShotBlobs[si]))) {
@@ -1417,7 +1473,7 @@ async function buildAllBlobs() {
   }
 
   try { await loadGagalinFont(); } catch (e) { /* fall back to system font */ }
-  var isPS = platSel === 'ps45' || platSel === 'ps5';
+  var isPS = !isCodeMode && (platSel === 'ps45' || platSel === 'ps5');
   var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl, isPS ? '#000000' : '#e8001d');
 
   if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
@@ -1456,10 +1512,13 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
 
     if (useShareAPI) {
       var allFiles = [
-        new File([blobs.thumbBlob],  gameName + '1.png', { type: 'image/png' }),
-        new File([blobs.promoBlob],  gameName + '2.png', { type: 'image/png' }),
-        new File([blobs.boxartBlob], gameName + '3.' + (blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg'), { type: blobs.boxartBlob.type })
-      ].concat(blobs.shotBlobs.map(function(b, i) {
+        new File([blobs.thumbBlob], gameName + '1.png', { type: 'image/png' }),
+        new File([blobs.promoBlob], gameName + '2.png', { type: 'image/png' }),
+      ];
+      if (blobs.boxartBlob) {
+        allFiles.push(new File([blobs.boxartBlob], gameName + '3.' + (blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg'), { type: blobs.boxartBlob.type }));
+      }
+      allFiles = allFiles.concat(blobs.shotBlobs.map(function(b, i) {
         var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
         return new File([b], gameName + (i + 4) + ext, { type: b.type });
       }));
@@ -1473,8 +1532,10 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
         saveBlobAs(b, gameName + (i + 4) + ext);
         await delay();
       }
-      saveBlobAs(blobs.boxartBlob, gameName + '3.' + (blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg'));
-      await delay();
+      if (blobs.boxartBlob) {
+        saveBlobAs(blobs.boxartBlob, gameName + '3.' + (blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg'));
+        await delay();
+      }
       saveBlobAs(blobs.promoBlob, gameName + '2.png');
       await delay();
       saveBlobAs(blobs.thumbBlob, gameName + '1.png');
@@ -1507,8 +1568,10 @@ el('tgSendBtn').addEventListener('click', async function() {
     fd.append('price', price);
     fd.append('images', new File([blobs.thumbBlob],  gameName + '1.png',  { type: 'image/png' }));
     fd.append('images', new File([blobs.promoBlob],  gameName + '2.png',  { type: 'image/png' }));
-    var baExt = blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg';
-    fd.append('images', new File([blobs.boxartBlob], gameName + '3.' + baExt, { type: blobs.boxartBlob.type }));
+    if (blobs.boxartBlob) {
+      var baExt = blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg';
+      fd.append('images', new File([blobs.boxartBlob], gameName + '3.' + baExt, { type: blobs.boxartBlob.type }));
+    }
     blobs.shotBlobs.forEach(function(b, i) {
       var ext = b.type.includes('png') ? '.png' : b.type.includes('webp') ? '.webp' : '.jpg';
       fd.append('images', new File([b], gameName + (i + 4) + ext, { type: b.type }));

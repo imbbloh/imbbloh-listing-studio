@@ -1219,9 +1219,17 @@ async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
   });
 }
 
-// Renders a 1080×1080 code thumbnail: cover fills the full canvas (cover-fill
-// crop), then the frame PNG is composited on top. No title text.
-async function renderCodeThumb(coverBlobUrl, frameBlobUrl) {
+// Renders a 1080×1080 code thumbnail: cover art contained within the frame's
+// transparent box, then the frame PNG composited on top. No title text.
+// Each frame has a different white-box position so areas are per codeSub.
+async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
+  // [areaX, areaY, areaW, areaH] — inner transparent region for each frame type
+  var areas = {
+    full:    [60, 200, 960, 680],
+    dlc:     [60, 455, 950, 430],
+    upgrade: [60, 455, 950, 430]
+  };
+  var area = areas[codeSub] || areas['full'];
   var canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1080;
   var ctx = canvas.getContext('2d');
@@ -1234,11 +1242,7 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl) {
     coverImg.src = coverBlobUrl;
   });
   // Contain cover art within the frame's inner transparent area.
-  // Adjust these four values to match the frame border dimensions:
-  var areaX = 60;   // left edge of transparent area
-  var areaY = 230;  // top edge of transparent area
-  var areaW = 960;  // width of transparent area
-  var areaH = 800;  // height of transparent area
+  var areaX = area[0], areaY = area[1], areaW = area[2], areaH = area[3];
   var scale = Math.min(areaW / coverImg.width, areaH / coverImg.height);
   var w = coverImg.width * scale;
   var h = coverImg.height * scale;
@@ -1351,7 +1355,7 @@ el('thumbBtn').addEventListener('click', async function() {
       var cCoverBlobUrl = URL.createObjectURL(cCoverBlob);
       curCoverDataUrl = cCoverBlobUrl;
 
-      var cThumbBlob = await renderCodeThumb(cCoverBlobUrl, cFrameBlobUrl);
+      var cThumbBlob = await renderCodeThumb(cCoverBlobUrl, cFrameBlobUrl, codeSub);
       URL.revokeObjectURL(cFrameBlobUrl);
 
       curCodeThumbDataUrl = URL.createObjectURL(cThumbBlob);
@@ -1557,7 +1561,7 @@ async function buildAllBlobs() {
       cbCoverBlobUrl = URL.createObjectURL(cbCoverBlob2);
       cbCoverUrl = cbCoverBlobUrl;
     }
-    thumbBlob = await renderCodeThumb(cbCoverUrl, cbFrameBlobUrl);
+    thumbBlob = await renderCodeThumb(cbCoverUrl, cbFrameBlobUrl, codeSub);
     URL.revokeObjectURL(cbFrameBlobUrl);
     if (cbCoverBlobUrl) URL.revokeObjectURL(cbCoverBlobUrl);
   } else {

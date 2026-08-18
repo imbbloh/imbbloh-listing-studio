@@ -1284,9 +1284,11 @@ el('thumbBtn').addEventListener('click', async function() {
       el('thumbTitle').value = gameTitle;
       curImageUrls = { coverUrl: null, screenshotUrls: [] };
 
+      var cPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
       el('thumbLinks').textContent =
         'Thumbnail (File 1): [generated — use downloaded file]' +
-        '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?type=' + codeSub;
+        '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?key=eshop' +
+        '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/code-promo-slide?key=' + cPlatKey;
 
       var cThumbImg = el('thumbPreview');
       await new Promise(function(resolve) { cThumbImg.onload = resolve; cThumbImg.src = codeData.thumbnailDataUrl; });
@@ -1430,17 +1432,15 @@ async function buildAllBlobs() {
   var fetchItems = [];
   if (needCoverFetch) fetchItems.push({ key: 'cover',  url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
   if (!frameDataUrl)  fetchItems.push({ key: 'frame',  url: THUMB_WORKER + '/frame' });
-  var promoSlideEndpoint;
   if (isCodeMode) {
-    promoSlideEndpoint = '/code-promo-slide?type=' + codeSub;
-  } else if (platSel === 'ps45' || platSel === 'ps5') {
-    promoSlideEndpoint = '/ps-promo-slide';
+    // File 2: eshop how-to-redeem; File 3: platform logos
+    var bPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
+    fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/code-promo-slide?key=eshop' });
+    fetchItems.push({ key: 'plat',  url: THUMB_WORKER + '/code-promo-slide?key=' + bPlatKey });
   } else {
-    promoSlideEndpoint = '/promo-slide';
-  }
-  fetchItems.push({ key: 'promo', url: THUMB_WORKER + promoSlideEndpoint });
-  if (!needCoverFetch && !isCodeMode) fetchItems.push({ key: 'boxart', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
-  if (!isCodeMode) {
+    var promoSlideEndpoint = (platSel === 'ps45' || platSel === 'ps5') ? '/ps-promo-slide' : '/promo-slide';
+    fetchItems.push({ key: 'promo', url: THUMB_WORKER + promoSlideEndpoint });
+    if (!needCoverFetch) fetchItems.push({ key: 'boxart', url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
     shots.forEach(function(u, i) {
       fetchItems.push({ key: 'shot' + i, url: THUMB_WORKER + '/download?url=' + encodeURIComponent(u) });
     });
@@ -1463,6 +1463,7 @@ async function buildAllBlobs() {
   if (frameBlobUrl) frameDataUrl = frameBlobUrl;
 
   var promoBlob    = blobMap.promo;
+  var platBlob     = blobMap.plat || null;
   var boxartBlob   = isCodeMode ? null : (blobMap.cover || blobMap.boxart || null);
   var rawShotBlobs = isCodeMode ? [] : shots.map(function(_, i) { return blobMap['shot' + i]; });
   var shotBlobs    = [];
@@ -1479,7 +1480,7 @@ async function buildAllBlobs() {
   if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
   if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);
 
-  return { thumbBlob: thumbBlob, promoBlob: promoBlob, boxartBlob: boxartBlob, shotBlobs: shotBlobs };
+  return { thumbBlob: thumbBlob, promoBlob: promoBlob, platBlob: platBlob, boxartBlob: boxartBlob, shotBlobs: shotBlobs };
 }
 
 el('thumbDownloadAllBtn').addEventListener('click', async function() {
@@ -1515,7 +1516,9 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
         new File([blobs.thumbBlob], gameName + '1.png', { type: 'image/png' }),
         new File([blobs.promoBlob], gameName + '2.png', { type: 'image/png' }),
       ];
-      if (blobs.boxartBlob) {
+      if (blobs.platBlob) {
+        allFiles.push(new File([blobs.platBlob], gameName + '3.png', { type: 'image/png' }));
+      } else if (blobs.boxartBlob) {
         allFiles.push(new File([blobs.boxartBlob], gameName + '3.' + (blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg'), { type: blobs.boxartBlob.type }));
       }
       allFiles = allFiles.concat(blobs.shotBlobs.map(function(b, i) {
@@ -1532,7 +1535,10 @@ el('thumbDownloadAllBtn').addEventListener('click', async function() {
         saveBlobAs(b, gameName + (i + 4) + ext);
         await delay();
       }
-      if (blobs.boxartBlob) {
+      if (blobs.platBlob) {
+        saveBlobAs(blobs.platBlob, gameName + '3.png');
+        await delay();
+      } else if (blobs.boxartBlob) {
         saveBlobAs(blobs.boxartBlob, gameName + '3.' + (blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg'));
         await delay();
       }
@@ -1568,7 +1574,9 @@ el('tgSendBtn').addEventListener('click', async function() {
     fd.append('price', price);
     fd.append('images', new File([blobs.thumbBlob],  gameName + '1.png',  { type: 'image/png' }));
     fd.append('images', new File([blobs.promoBlob],  gameName + '2.png',  { type: 'image/png' }));
-    if (blobs.boxartBlob) {
+    if (blobs.platBlob) {
+      fd.append('images', new File([blobs.platBlob], gameName + '3.png', { type: 'image/png' }));
+    } else if (blobs.boxartBlob) {
       var baExt = blobs.boxartBlob.type.includes('png') ? 'png' : 'jpg';
       fd.append('images', new File([blobs.boxartBlob], gameName + '3.' + baExt, { type: blobs.boxartBlob.type }));
     }

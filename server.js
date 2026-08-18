@@ -72,11 +72,13 @@ try {
   CODE_FRAME_B64['upgrade'] = CODE_FRAME_PNG['upgrade'].toString('base64');
 } catch (e) { console.warn('assets/code-upgrade-frame.png not found'); }
 
-// Promos (one per code type, platform-agnostic)
-['full', 'dlc', 'upgrade'].forEach(type => {
+// Promos: 3 shared files regardless of code type
+// File 2: eshop how-to-redeem (same for all)
+// File 3: platform logos (ns12 = NS1+NS2 logos, ns2 = NS2 logo only)
+['eshop', 'ns12', 'ns2'].forEach(key => {
   try {
-    CODE_PROMO_PNG[type] = fs.readFileSync(path.join(__dirname, `assets/code-${type}-promo.png`));
-  } catch (e) { console.warn(`assets/code-${type}-promo.png not found`); }
+    CODE_PROMO_PNG[key] = fs.readFileSync(path.join(__dirname, `assets/code-promo-${key}.png`));
+  } catch (e) { console.warn(`assets/code-promo-${key}.png not found`); }
 });
 
 const CANVAS_W    = 1080;
@@ -249,11 +251,12 @@ app.get('/ps-frame', (req, res) => {
   res.send(PS_FRAME_PNG);
 });
 
+// ?key=eshop|ns12|ns2
 app.get('/code-promo-slide', (req, res) => {
-  const type  = (req.query.type || 'full').toLowerCase();
-  const promo = CODE_PROMO_PNG[type];
-  if (!promo) return res.status(404).json({ error: `assets/code-${type}-promo.png not found — upload the file and redeploy` });
-  const filename = req.query.filename ? decodeURIComponent(req.query.filename) + '.png' : `code-${type}-promo.png`;
+  const key   = (req.query.key || 'eshop').toLowerCase();
+  const promo = CODE_PROMO_PNG[key];
+  if (!promo) return res.status(404).json({ error: `assets/code-promo-${key}.png not found — upload the file and redeploy` });
+  const filename = req.query.filename ? decodeURIComponent(req.query.filename) + '.png' : `code-promo-${key}.png`;
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.send(promo);

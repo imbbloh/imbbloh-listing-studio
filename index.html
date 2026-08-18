@@ -853,13 +853,14 @@ function genCode(name) {
       'Tags: ' + tag + ' DLC ' + name;
 
   } else if (codeSub === 'upgrade') {
+    var upgradeBaseName = name.replace(/\s*Upgrade Pack\s*$/i, '');
     txt =
       hdrNS2 + ' (Upgrade Pack / DLC) [Nintendo Official Digital Codes]\n\n' +
-      name + ' (Upgrade Pack) \u2013 Digital Game Code\n\n' +
+      upgradeBaseName + ' (Upgrade Pack) \u2013 Digital Game Code\n\n' +
       bl + '\n\n' +
       '\uD83D\uDD39 Upgrade Pack: Nintendo Switch 2 Edition - $' + price + '\n\n' +
       footer +
-      'Tags: ' + tag + ' ' + name + ' Upgrade Pack';
+      'Tags: ' + tag + ' ' + name;
 
   } else {
     txt =

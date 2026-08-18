@@ -1233,8 +1233,8 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl) {
     coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
     coverImg.src = coverBlobUrl;
   });
-  // Cover-fill: scale to cover 1080×1080, centre-crop excess
-  var scale = Math.max(1080 / coverImg.width, 1080 / coverImg.height);
+  // Contain: scale to fit inside 1080×1080, centre, no cropping
+  var scale = Math.min(1080 / coverImg.width, 1080 / coverImg.height);
   var w = coverImg.width * scale;
   var h = coverImg.height * scale;
   ctx.drawImage(coverImg, (1080 - w) / 2, (1080 - h) / 2, w, h);

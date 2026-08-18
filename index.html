@@ -1225,8 +1225,8 @@ async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
 async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
   // [areaX, areaY, areaW, areaH] — inner transparent region for each frame type
   var areas = {
-    full:    [60, 200, 960, 680],
-    dlc:     [60, 455, 950, 490],
+    full:    [90, 195, 900, 725],  // large square-ish white box for full game
+    dlc:     [60, 455, 950, 490],  // same layout as upgrade pack
     upgrade: [60, 455, 950, 490]
   };
   var area = areas[codeSub] || areas['full'];

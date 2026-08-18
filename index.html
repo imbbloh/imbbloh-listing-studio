@@ -1120,6 +1120,10 @@ el('filt-ps').addEventListener('click',  function() { setFilter('ps'); });
 // Game name input — auto URL + enter to generate
 el('gameName').addEventListener('input', function() {
   if (appMode === 'game') autoUrl();
+  if (appMode === 'code' && /upgrade pack/i.test(this.value)) {
+    if (codeSub !== 'upgrade') setSub('upgrade');
+    if (platSel  !== 'ns2')   setPlatform('ns2');
+  }
 });
 el('gameName').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') doGenerate();

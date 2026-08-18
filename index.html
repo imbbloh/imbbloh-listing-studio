@@ -1288,8 +1288,7 @@ el('thumbBtn').addEventListener('click', async function() {
         '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?key=eshop' +
         '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/code-promo-slide?key=' + cPlatKey;
 
-      var cThumbImg = el('thumbPreview');
-      await new Promise(function(resolve) { cThumbImg.onload = resolve; cThumbImg.src = codeData.thumbnailDataUrl; });
+      el('thumbPreview').src = codeData.thumbnailDataUrl;
       el('thumbCard').style.display = 'block';
       btn.textContent = '✓ Done';
       showToast('Thumbnail ready!');
@@ -1349,8 +1348,9 @@ el('thumbBtn').addEventListener('click', async function() {
     el('thumbLinks').textContent = links;
 
     var thumbImg = el('thumbPreview');
-    await new Promise(function(resolve) {
+    await new Promise(function(resolve, reject) {
       thumbImg.onload = resolve;
+      thumbImg.onerror = function() { reject(new Error('Failed to display thumbnail')); };
       thumbImg.src = data.thumbnailDataUrl;
     });
 
@@ -1430,7 +1430,7 @@ async function buildAllBlobs() {
   var needCoverFetch = !coverDataUrl && !isCodeMode;
   var fetchItems = [];
   if (needCoverFetch) fetchItems.push({ key: 'cover',  url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
-  if (!frameDataUrl)  fetchItems.push({ key: 'frame',  url: THUMB_WORKER + '/frame' });
+  if (!frameDataUrl && !isCodeMode) fetchItems.push({ key: 'frame',  url: THUMB_WORKER + '/frame' });
   if (isCodeMode) {
     // File 2: eshop how-to-redeem; File 3: platform logos
     var bPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';

@@ -1226,8 +1226,8 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
   // [areaX, areaY, areaW, areaH] — inner transparent region for each frame type
   var areas = {
     full:    [60, 200, 960, 680],
-    dlc:     [60, 455, 950, 430],
-    upgrade: [60, 455, 950, 430]
+    dlc:     [60, 455, 950, 490],
+    upgrade: [60, 455, 950, 490]
   };
   var area = areas[codeSub] || areas['full'];
   var canvas = document.createElement('canvas');
@@ -1241,13 +1241,12 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
     coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
     coverImg.src = coverBlobUrl;
   });
-  // Scale by width to fill the horizontal white borders exactly; centre vertically.
-  // No cropping — the frame PNG overlay covers any small overflow above/below.
+  // Contain: fit full image within box, no cropping, centre in both axes.
   var areaX = area[0], areaY = area[1], areaW = area[2], areaH = area[3];
-  var scale = areaW / coverImg.width;
-  var w = areaW;
+  var scale = Math.min(areaW / coverImg.width, areaH / coverImg.height);
+  var w = coverImg.width * scale;
   var h = coverImg.height * scale;
-  ctx.drawImage(coverImg, areaX, areaY + (areaH - h) / 2, w, h);
+  ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);
   var frameImg = new Image();
   await new Promise(function(resolve, reject) {
     frameImg.onload = resolve;

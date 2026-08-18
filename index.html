@@ -1233,11 +1233,13 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl) {
     coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
     coverImg.src = coverBlobUrl;
   });
-  // Contain: scale to fit inside 1080×1080, centre, no cropping
+  // Contain: scale to fit inside 1080×1080, centre horizontally, shift down
+  // to align with the frame's transparent area (top branding takes ~80px)
   var scale = Math.min(1080 / coverImg.width, 1080 / coverImg.height);
   var w = coverImg.width * scale;
   var h = coverImg.height * scale;
-  ctx.drawImage(coverImg, (1080 - w) / 2, (1080 - h) / 2, w, h);
+  var yOffset = 80;
+  ctx.drawImage(coverImg, (1080 - w) / 2, (1080 - h) / 2 + yOffset, w, h);
   var frameImg = new Image();
   await new Promise(function(resolve, reject) {
     frameImg.onload = resolve;

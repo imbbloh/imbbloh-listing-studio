@@ -524,7 +524,7 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
   <div class="card" id="thumbCard" style="display:none">
     <div class="card-title">🖼️ Thumbnail</div>
     <img id="thumbPreview" style="width:100%;border-radius:6px;margin-bottom:12px" alt="Thumbnail preview"/>
-    <div class="form-group" style="margin-bottom:14px">
+    <div class="form-group" id="thumbTitleGroup" style="margin-bottom:14px">
       <label>Edit Title</label>
       <input type="text" id="thumbTitle" autocomplete="off" autocorrect="off" spellcheck="false">
     </div>
@@ -581,10 +581,11 @@ var CF = {
 var appMode   = 'game';   // 'game' | 'code'
 var platSel   = null;     // 'ns12' | 'ns2' | 'ps45' | 'ps5'
 var codeSub   = 'full';   // 'full' | 'dlc' | 'upgrade'
-var curCopy         = '';
-var curImageUrls    = null; // { coverUrl, screenshotUrls } from last generation
-var curSvg          = null; // decoded SVG string for client-side title editing
-var curCoverDataUrl = null; // cover JPEG as data URL, set when thumbnail generated
+var curCopy             = '';
+var curImageUrls        = null; // { coverUrl, screenshotUrls } from last generation
+var curSvg              = null; // decoded SVG string for client-side title editing
+var curCoverDataUrl     = null; // cover JPEG as data URL, set when thumbnail generated
+var curCodeThumbDataUrl = null; // PNG data URL for code mode thumbnails
 var curFilt   = 'all';
 var saved     = JSON.parse(localStorage.getItem('ibl') || '[]');
 
@@ -1264,25 +1265,22 @@ el('thumbBtn').addEventListener('click', async function() {
   btn.textContent = 'Generating…';
   el('thumbCard').style.display = 'none';
 
-  // ── Code mode: no store URL, no cover scraping ─────────────────────────
+  // ── Code mode: frame PNG is the full thumbnail, no title overlay ──────────
   if (appMode === 'code') {
     try {
       var codeRes = await fetch(THUMB_WORKER + '/code-thumb', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameTitle: gameTitle, codeSub: codeSub, platSel: platSel })
+        body: JSON.stringify({ codeSub: codeSub, platSel: platSel })
       });
       var codeData = await codeRes.json();
       if (!codeRes.ok) throw new Error(codeData.error || 'Worker error ' + codeRes.status);
 
-      var cSvgBytes = atob(codeData.thumbnailDataUrl.split(',')[1]);
-      var cSvgArr = new Uint8Array(cSvgBytes.length);
-      for (var ci = 0; ci < cSvgBytes.length; ci++) cSvgArr[ci] = cSvgBytes.charCodeAt(ci);
-      curSvg = new TextDecoder('utf-8').decode(cSvgArr);
-      gagalinFontPromise = null;
+      curSvg = null;
+      curCodeThumbDataUrl = codeData.thumbnailDataUrl;
       curCoverDataUrl = null;
-      el('thumbTitle').value = gameTitle;
       curImageUrls = { coverUrl: null, screenshotUrls: [] };
+      el('thumbTitleGroup').style.display = 'none';
 
       var cPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
       el('thumbLinks').textContent =
@@ -1325,6 +1323,7 @@ el('thumbBtn').addEventListener('click', async function() {
 
     // Decode SVG and wait for the <img> to fully paint (cover JPEG inside SVG
     // loads async; without waiting the card flashes a plain red background first).
+    el('thumbTitleGroup').style.display = '';
     var svgBytes = atob(data.thumbnailDataUrl.split(',')[1]);
     var svgArr = new Uint8Array(svgBytes.length);
     for (var j = 0; j < svgBytes.length; j++) svgArr[j] = svgBytes.charCodeAt(j);
@@ -1457,11 +1456,6 @@ async function buildAllBlobs() {
   fetchItems.forEach(function(item, i) { blobMap[item.key] = fetchedBlobs[i]; });
 
   // Same-origin object URLs don't taint the canvas
-  var coverBlobUrl = blobMap.cover ? URL.createObjectURL(blobMap.cover) : null;
-  var frameBlobUrl = blobMap.frame ? URL.createObjectURL(blobMap.frame) : null;
-  if (coverBlobUrl) coverDataUrl = coverBlobUrl;
-  if (frameBlobUrl) frameDataUrl = frameBlobUrl;
-
   var promoBlob    = blobMap.promo;
   var platBlob     = blobMap.plat || null;
   var boxartBlob   = isCodeMode ? null : (blobMap.cover || blobMap.boxart || null);
@@ -1473,12 +1467,23 @@ async function buildAllBlobs() {
     }
   }
 
-  try { await loadGagalinFont(); } catch (e) { /* fall back to system font */ }
-  var isPS = !isCodeMode && (platSel === 'ps45' || platSel === 'ps5');
-  var thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl, isPS ? '#000000' : '#e8001d');
+  var thumbBlob;
+  if (isCodeMode) {
+    // Code mode: thumbnail is the frame PNG itself (no title overlay)
+    thumbBlob = await fetch(curCodeThumbDataUrl).then(function(r) { return r.blob(); });
+  } else {
+    var coverBlobUrl = blobMap.cover ? URL.createObjectURL(blobMap.cover) : null;
+    var frameBlobUrl = blobMap.frame ? URL.createObjectURL(blobMap.frame) : null;
+    if (coverBlobUrl) coverDataUrl = coverBlobUrl;
+    if (frameBlobUrl) frameDataUrl = frameBlobUrl;
 
-  if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
-  if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);
+    try { await loadGagalinFont(); } catch (e) { /* fall back to system font */ }
+    var isPS = platSel === 'ps45' || platSel === 'ps5';
+    thumbBlob = await renderCanvasToBlob(title, coverDataUrl, frameDataUrl, isPS ? '#000000' : '#e8001d');
+
+    if (coverBlobUrl) URL.revokeObjectURL(coverBlobUrl);
+    if (frameBlobUrl) URL.revokeObjectURL(frameBlobUrl);
+  }
 
   return { thumbBlob: thumbBlob, promoBlob: promoBlob, platBlob: platBlob, boxartBlob: boxartBlob, shotBlobs: shotBlobs };
 }

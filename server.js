@@ -263,8 +263,8 @@ app.get('/code-promo-slide', (req, res) => {
 });
 
 app.post('/code-thumb', (req, res) => {
-  const { gameTitle, codeSub, platSel } = req.body || {};
-  if (!gameTitle || !codeSub) return res.status(400).json({ error: 'Missing gameTitle or codeSub' });
+  const { codeSub, platSel } = req.body || {};
+  if (!codeSub) return res.status(400).json({ error: 'Missing codeSub' });
 
   // Resolve frame key: DLC is platform-specific; full and upgrade are not
   let frameKey;
@@ -276,9 +276,7 @@ app.post('/code-thumb', (req, res) => {
 
   const frameB64 = CODE_FRAME_B64[frameKey];
   if (!frameB64) return res.status(404).json({ error: `Frame asset for ${codeSub}/${platSel || 'any'} not found — upload assets/code-${frameKey}-frame.png and redeploy` });
-  const svg              = buildCodeThumbnailSvg(gameTitle, frameB64, FONT_BASE64);
-  const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
-  res.json({ thumbnailDataUrl });
+  res.json({ thumbnailDataUrl: 'data:image/png;base64,' + frameB64 });
 });
 
 app.get('/ps-promo-slide', (req, res) => {

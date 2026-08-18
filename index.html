@@ -1241,12 +1241,17 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
     coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
     coverImg.src = coverBlobUrl;
   });
-  // Contain cover art within the frame's inner transparent area.
+  // Cover-fill: scale to fill the white box area in both dimensions, clip overflow.
   var areaX = area[0], areaY = area[1], areaW = area[2], areaH = area[3];
-  var scale = Math.min(areaW / coverImg.width, areaH / coverImg.height);
+  var scale = Math.max(areaW / coverImg.width, areaH / coverImg.height);
   var w = coverImg.width * scale;
   var h = coverImg.height * scale;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(areaX, areaY, areaW, areaH);
+  ctx.clip();
   ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);
+  ctx.restore();
   var frameImg = new Image();
   await new Promise(function(resolve, reject) {
     frameImg.onload = resolve;

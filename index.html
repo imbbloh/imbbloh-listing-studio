@@ -1233,13 +1233,16 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl) {
     coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
     coverImg.src = coverBlobUrl;
   });
-  // Contain: scale to fit inside 1080×1080, centre horizontally, shift down
-  // to align with the frame's transparent area (top branding takes ~80px)
-  var scale = Math.min(1080 / coverImg.width, 1080 / coverImg.height);
+  // Contain cover art within the frame's inner transparent area.
+  // Adjust these four values to match the frame border dimensions:
+  var areaX = 60;   // left edge of transparent area
+  var areaY = 160;  // top edge of transparent area
+  var areaW = 960;  // width of transparent area
+  var areaH = 800;  // height of transparent area
+  var scale = Math.min(areaW / coverImg.width, areaH / coverImg.height);
   var w = coverImg.width * scale;
   var h = coverImg.height * scale;
-  var yOffset = 80;
-  ctx.drawImage(coverImg, (1080 - w) / 2, (1080 - h) / 2 + yOffset, w, h);
+  ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);
   var frameImg = new Image();
   await new Promise(function(resolve, reject) {
     frameImg.onload = resolve;

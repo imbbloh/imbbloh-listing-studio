@@ -48,14 +48,32 @@ try {
 
 const PS_PROMO_PNG = fs.readFileSync(path.join(__dirname, 'assets/ps-promo-slide.png'));
 
-const CODE_FRAME_PNG = { full: null, dlc: null, upgrade: null };
-const CODE_FRAME_B64 = { full: null, dlc: null, upgrade: null };
-const CODE_PROMO_PNG = { full: null, dlc: null, upgrade: null };
-['full', 'dlc', 'upgrade'].forEach(type => {
+const CODE_FRAME_PNG = {};
+const CODE_FRAME_B64 = {};
+const CODE_PROMO_PNG = {};
+
+// Full Game: one frame covers both NS1&2 and NS2
+try {
+  CODE_FRAME_PNG['full'] = fs.readFileSync(path.join(__dirname, 'assets/code-full-frame.png'));
+  CODE_FRAME_B64['full'] = CODE_FRAME_PNG['full'].toString('base64');
+} catch (e) { console.warn('assets/code-full-frame.png not found'); }
+
+// DLC: platform-specific frames (NS1&2 shows NS logo, NS2 shows NS2 logo)
+['ns12', 'ns2'].forEach(plat => {
   try {
-    CODE_FRAME_PNG[type] = fs.readFileSync(path.join(__dirname, `assets/code-${type}-frame.png`));
-    CODE_FRAME_B64[type] = CODE_FRAME_PNG[type].toString('base64');
-  } catch (e) { console.warn(`assets/code-${type}-frame.png not found`); }
+    CODE_FRAME_PNG[`dlc-${plat}`] = fs.readFileSync(path.join(__dirname, `assets/code-dlc-${plat}-frame.png`));
+    CODE_FRAME_B64[`dlc-${plat}`] = CODE_FRAME_PNG[`dlc-${plat}`].toString('base64');
+  } catch (e) { console.warn(`assets/code-dlc-${plat}-frame.png not found`); }
+});
+
+// Upgrade Pack: NS2 only
+try {
+  CODE_FRAME_PNG['upgrade'] = fs.readFileSync(path.join(__dirname, 'assets/code-upgrade-frame.png'));
+  CODE_FRAME_B64['upgrade'] = CODE_FRAME_PNG['upgrade'].toString('base64');
+} catch (e) { console.warn('assets/code-upgrade-frame.png not found'); }
+
+// Promos (one per code type, platform-agnostic)
+['full', 'dlc', 'upgrade'].forEach(type => {
   try {
     CODE_PROMO_PNG[type] = fs.readFileSync(path.join(__dirname, `assets/code-${type}-promo.png`));
   } catch (e) { console.warn(`assets/code-${type}-promo.png not found`); }
@@ -242,11 +260,19 @@ app.get('/code-promo-slide', (req, res) => {
 });
 
 app.post('/code-thumb', (req, res) => {
-  const { gameTitle, codeSub } = req.body || {};
+  const { gameTitle, codeSub, platSel } = req.body || {};
   if (!gameTitle || !codeSub) return res.status(400).json({ error: 'Missing gameTitle or codeSub' });
-  const type    = codeSub.toLowerCase();
-  const frameB64 = CODE_FRAME_B64[type];
-  if (!frameB64) return res.status(404).json({ error: `assets/code-${type}-frame.png not found — upload the file and redeploy` });
+
+  // Resolve frame key: DLC is platform-specific; full and upgrade are not
+  let frameKey;
+  if (codeSub === 'dlc') {
+    frameKey = platSel === 'ns2' ? 'dlc-ns2' : 'dlc-ns12';
+  } else {
+    frameKey = codeSub; // 'full' or 'upgrade'
+  }
+
+  const frameB64 = CODE_FRAME_B64[frameKey];
+  if (!frameB64) return res.status(404).json({ error: `Frame asset for ${codeSub}/${platSel || 'any'} not found — upload assets/code-${frameKey}-frame.png and redeploy` });
   const svg              = buildCodeThumbnailSvg(gameTitle, frameB64, FONT_BASE64);
   const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
   res.json({ thumbnailDataUrl });

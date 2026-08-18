@@ -1270,7 +1270,7 @@ el('thumbBtn').addEventListener('click', async function() {
       var codeRes = await fetch(THUMB_WORKER + '/code-thumb', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameTitle: gameTitle, codeSub: codeSub })
+        body: JSON.stringify({ gameTitle: gameTitle, codeSub: codeSub, platSel: platSel })
       });
       var codeData = await codeRes.json();
       if (!codeRes.ok) throw new Error(codeData.error || 'Worker error ' + codeRes.status);

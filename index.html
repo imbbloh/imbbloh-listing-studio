@@ -966,7 +966,7 @@ function doSave() {
     if (isCode) {
       var codeTitle = name;
       if (codeSub === 'dlc')     codeTitle = name + ' (DLC)';
-      if (codeSub === 'upgrade') codeTitle = name + ' (Upgrade Pack)';
+      if (codeSub === 'upgrade') codeTitle = name.replace(/\s*Upgrade Pack\s*$/i, '') + ' (Upgrade Pack)';
       fd.append(CF.title,    codeTitle);
       fd.append(CF.price,    el('codePrice').value);
       fd.append(CF.platform, cmap[platSel]);

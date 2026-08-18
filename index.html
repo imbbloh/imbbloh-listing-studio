@@ -1267,37 +1267,33 @@ el('thumbBtn').addEventListener('click', async function() {
 
   // ── Code mode: frame PNG is the full thumbnail, no title overlay ──────────
   if (appMode === 'code') {
-    try {
-      var codeRes = await fetch(THUMB_WORKER + '/code-thumb', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codeSub: codeSub, platSel: platSel })
-      });
-      var codeData = await codeRes.json();
-      if (!codeRes.ok) throw new Error(codeData.error || 'Worker error ' + codeRes.status);
+    var cFrameUrl = THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + (platSel || 'ns12');
+    curSvg = null;
+    curCodeThumbDataUrl = cFrameUrl;
+    curCoverDataUrl = null;
+    curImageUrls = { coverUrl: null, screenshotUrls: [] };
+    el('thumbTitleGroup').style.display = 'none';
 
-      curSvg = null;
-      curCodeThumbDataUrl = codeData.thumbnailDataUrl;
-      curCoverDataUrl = null;
-      curImageUrls = { coverUrl: null, screenshotUrls: [] };
-      el('thumbTitleGroup').style.display = 'none';
+    var cPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
+    el('thumbLinks').textContent =
+      'Thumbnail (File 1): [generated — use downloaded file]' +
+      '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?key=eshop' +
+      '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/code-promo-slide?key=' + cPlatKey;
 
-      var cPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
-      el('thumbLinks').textContent =
-        'Thumbnail (File 1): [generated — use downloaded file]' +
-        '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?key=eshop' +
-        '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/code-promo-slide?key=' + cPlatKey;
-
-      el('thumbPreview').src = codeData.thumbnailDataUrl;
+    var cThumbImg = el('thumbPreview');
+    cThumbImg.onerror = function() {
+      btn.disabled = false;
+      btn.textContent = '🖼️ Generate Thumbnail';
+      showToast('Thumbnail failed — server may be starting up, try again', true);
+    };
+    cThumbImg.onload = function() {
       el('thumbCard').style.display = 'block';
+      btn.disabled = false;
       btn.textContent = '✓ Done';
       showToast('Thumbnail ready!');
       setTimeout(function() { el('thumbCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
-    } catch (e) {
-      btn.disabled = false;
-      btn.textContent = '🖼️ Generate Thumbnail';
-      showToast(e.message || 'Thumbnail failed', true);
-    }
+    };
+    cThumbImg.src = cFrameUrl;
     return;
   }
 

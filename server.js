@@ -262,11 +262,11 @@ app.get('/code-promo-slide', (req, res) => {
   res.send(promo);
 });
 
-app.post('/code-thumb', (req, res) => {
-  const { codeSub, platSel } = req.body || {};
-  if (!codeSub) return res.status(400).json({ error: 'Missing codeSub' });
+// ?sub=full|dlc|upgrade  &plat=ns12|ns2
+app.get('/code-frame', (req, res) => {
+  const codeSub = (req.query.sub  || 'full').toLowerCase();
+  const platSel = (req.query.plat || 'ns12').toLowerCase();
 
-  // Resolve frame key: DLC is platform-specific; full and upgrade are not
   let frameKey;
   if (codeSub === 'dlc') {
     frameKey = platSel === 'ns2' ? 'dlc-ns2' : 'dlc-ns12';
@@ -274,9 +274,10 @@ app.post('/code-thumb', (req, res) => {
     frameKey = codeSub; // 'full' or 'upgrade'
   }
 
-  const frameB64 = CODE_FRAME_B64[frameKey];
-  if (!frameB64) return res.status(404).json({ error: `Frame asset for ${codeSub}/${platSel || 'any'} not found — upload assets/code-${frameKey}-frame.png and redeploy` });
-  res.json({ thumbnailDataUrl: 'data:image/png;base64,' + frameB64 });
+  const frame = CODE_FRAME_PNG[frameKey];
+  if (!frame) return res.status(404).json({ error: `Frame asset for ${codeSub}/${platSel} not found` });
+  res.setHeader('Content-Type', 'image/png');
+  res.send(frame);
 });
 
 app.get('/ps-promo-slide', (req, res) => {

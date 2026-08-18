@@ -1241,17 +1241,13 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
     coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
     coverImg.src = coverBlobUrl;
   });
-  // Cover-fill: scale to fill the white box area in both dimensions, clip overflow.
+  // Scale by width to fill the horizontal white borders exactly; centre vertically.
+  // No cropping — the frame PNG overlay covers any small overflow above/below.
   var areaX = area[0], areaY = area[1], areaW = area[2], areaH = area[3];
-  var scale = Math.max(areaW / coverImg.width, areaH / coverImg.height);
-  var w = coverImg.width * scale;
+  var scale = areaW / coverImg.width;
+  var w = areaW;
   var h = coverImg.height * scale;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(areaX, areaY, areaW, areaH);
-  ctx.clip();
-  ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);
-  ctx.restore();
+  ctx.drawImage(coverImg, areaX, areaY + (areaH - h) / 2, w, h);
   var frameImg = new Image();
   await new Promise(function(resolve, reject) {
     frameImg.onload = resolve;

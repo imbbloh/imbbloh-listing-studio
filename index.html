@@ -1219,6 +1219,40 @@ async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
   });
 }
 
+// Renders a 1080×1080 code thumbnail: cover fills the full canvas (cover-fill
+// crop), then the frame PNG is composited on top. No title text.
+async function renderCodeThumb(coverBlobUrl, frameBlobUrl) {
+  var canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1080;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#e8001d';
+  ctx.fillRect(0, 0, 1080, 1080);
+  var coverImg = new Image();
+  await new Promise(function(resolve, reject) {
+    coverImg.onload = resolve;
+    coverImg.onerror = function() { reject(new Error('Cover image failed to load')); };
+    coverImg.src = coverBlobUrl;
+  });
+  // Cover-fill: scale to cover 1080×1080, centre-crop excess
+  var scale = Math.max(1080 / coverImg.width, 1080 / coverImg.height);
+  var w = coverImg.width * scale;
+  var h = coverImg.height * scale;
+  ctx.drawImage(coverImg, (1080 - w) / 2, (1080 - h) / 2, w, h);
+  var frameImg = new Image();
+  await new Promise(function(resolve, reject) {
+    frameImg.onload = resolve;
+    frameImg.onerror = function() { reject(new Error('Frame image failed to load')); };
+    frameImg.src = frameBlobUrl;
+  });
+  ctx.drawImage(frameImg, 0, 0, 1080, 1080);
+  return new Promise(function(resolve, reject) {
+    canvas.toBlob(function(blob) {
+      if (blob) resolve(blob);
+      else reject(new Error('Canvas toBlob failed'));
+    }, 'image/png');
+  });
+}
+
 // ── Thumbnail title editor ─────────────────────────────────────────────────
 function thumbTitleFontSize(n) {
   if (n <= 12) return 80;
@@ -1277,15 +1311,26 @@ el('thumbBtn').addEventListener('click', async function() {
         .replace(/\.(\d)/g, '-$1').replace(/\./g, '')
         .toLowerCase().trim().replace(/\s+/g, '-')
         .replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
-      var cStoreUrl = 'www.nintendo.com/us/store/products/' + cSlug + (platSel === 'ns2' ? '-switch-2/' : '-switch/');
+      // Always try NS2 URL first; fall back to NS1 if not found
+      var cStoreUrlNs2 = 'www.nintendo.com/us/store/products/' + cSlug + '-switch-2/';
+      var cStoreUrlNs1 = 'www.nintendo.com/us/store/products/' + cSlug + '-switch/';
 
       btn.textContent = 'Fetching cover…';
       var cRes = await fetch(THUMB_WORKER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeUrl: cStoreUrl, gameTitle: cName })
+        body: JSON.stringify({ storeUrl: cStoreUrlNs2, gameTitle: cName })
       });
       var cData = await cRes.json();
+      if (!cRes.ok && platSel !== 'ns2') {
+        // NS2 URL failed — retry with NS1
+        cRes = await fetch(THUMB_WORKER, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storeUrl: cStoreUrlNs1, gameTitle: cName })
+        });
+        cData = await cRes.json();
+      }
       if (!cRes.ok) throw new Error(cData.error || 'Worker error ' + cRes.status);
 
       btn.textContent = 'Building thumbnail…';
@@ -1301,8 +1346,7 @@ el('thumbBtn').addEventListener('click', async function() {
       var cCoverBlobUrl = URL.createObjectURL(cCoverBlob);
       curCoverDataUrl = cCoverBlobUrl;
 
-      try { await loadGagalinFont(); } catch (e) {}
-      var cThumbBlob = await renderCanvasToBlob('', cCoverBlobUrl, cFrameBlobUrl, '#e8001d');
+      var cThumbBlob = await renderCodeThumb(cCoverBlobUrl, cFrameBlobUrl);
       URL.revokeObjectURL(cFrameBlobUrl);
 
       curCodeThumbDataUrl = URL.createObjectURL(cThumbBlob);
@@ -1508,8 +1552,7 @@ async function buildAllBlobs() {
       cbCoverBlobUrl = URL.createObjectURL(cbCoverBlob2);
       cbCoverUrl = cbCoverBlobUrl;
     }
-    try { await loadGagalinFont(); } catch (e) {}
-    thumbBlob = await renderCanvasToBlob('', cbCoverUrl, cbFrameBlobUrl, '#e8001d');
+    thumbBlob = await renderCodeThumb(cbCoverUrl, cbFrameBlobUrl);
     URL.revokeObjectURL(cbFrameBlobUrl);
     if (cbCoverBlobUrl) URL.revokeObjectURL(cbCoverBlobUrl);
   } else {

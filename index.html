@@ -1230,8 +1230,8 @@ async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
 async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
   // [areaX, areaY, areaW, areaH] — inner transparent region for each frame type
   var areas = {
-    full:    [90, 195, 900, 725],  // large square-ish white box for full game
-    dlc:     [60, 455, 950, 490],  // same layout as upgrade pack
+    full:    [75, 185, 930, 760],  // transparent interior of the full-game white box
+    dlc:     [60, 455, 950, 490],
     upgrade: [60, 455, 950, 490]
   };
   var area = areas[codeSub] || areas['full'];
@@ -1247,11 +1247,10 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
     coverImg.src = coverBlobUrl;
   });
   var areaX = area[0], areaY = area[1], areaW = area[2], areaH = area[3];
-  // Full game: contain (square box art must fit entirely within the box).
+  // Full game: cover/fill width so square box art reaches all four edges.
+  // Slight height overflow is hidden behind the frame's opaque header/footer.
   // DLC / Upgrade: width-fill (wide landscape art, frame masks vertical overflow).
-  var scale = codeSub === 'full'
-    ? Math.min(areaW / coverImg.width, areaH / coverImg.height)
-    : areaW / coverImg.width;
+  var scale = areaW / coverImg.width;
   var w = coverImg.width * scale;
   var h = coverImg.height * scale;
   ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);

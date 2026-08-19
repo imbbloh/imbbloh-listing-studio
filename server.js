@@ -136,7 +136,17 @@ function extractNintendoAssets(html) {
   const hashes   = [...new Set(
     matches.filter(m => m[1] === platform && m[2] === nsuid).map(m => m[3])
   )].slice(0, 10);
-  return { platform, nsuid, hashes };
+
+  // Look for the square box art hash: Nintendo CDN URLs that appear WITHOUT the ar_16:9
+  // landscape transform (q_auto/f_auto prefix) are natural-aspect-ratio box art images.
+  let squareHash = null;
+  const sqRe = /q_auto\/f_auto\/store\/software\/(switch2?)\/(\d{14})\/([a-zA-Z0-9_-]{20,})/g;
+  for (const m of html.matchAll(sqRe)) {
+    if (m[1] === platform && m[2] === nsuid) { squareHash = m[3]; break; }
+  }
+  console.log('[NS] platform:', platform, 'nsuid:', nsuid, 'hashes:', hashes, 'squareHash:', squareHash);
+
+  return { platform, nsuid, hashes, squareHash };
 }
 
 function extractPsAssets(html) {
@@ -199,13 +209,14 @@ function buildCodeThumbnailSvg(gameTitle, frameBase64, fontBase64) {
 </svg>`;
 }
 
-function buildCdnUrls(platform, nsuid, hashes) {
-  const base     = 'https://assets.nintendo.com/image/upload';
-  const mainPath = `store/software/${platform}/${nsuid}/${hashes[0]}`;
+function buildCdnUrls(platform, nsuid, hashes, squareHash) {
+  const base       = 'https://assets.nintendo.com/image/upload';
+  const mainPath   = `store/software/${platform}/${nsuid}/${hashes[0]}`;
+  const squarePath = `store/software/${platform}/${nsuid}/${squareHash || hashes[0]}`;
   return {
     upload:          `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
     coverUrl:        `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,
-    squareCoverUrl:  `${base}/q_auto/f_auto/${mainPath}`,
+    squareCoverUrl:  `${base}/q_auto/f_auto/${squarePath}`,
     screenshotUrls: hashes.map(h =>
       `${base}/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_1.5/store/software/${platform}/${nsuid}/${h}`
     )
@@ -496,8 +507,8 @@ app.post('/', async (req, res) => {
       return res.json({ thumbnailDataUrl, coverUrl, screenshotUrls });
     }
 
-    const { platform, nsuid, hashes } = extractNintendoAssets(html);
-    const cdn = buildCdnUrls(platform, nsuid, hashes);
+    const { platform, nsuid, hashes, squareHash } = extractNintendoAssets(html);
+    const cdn = buildCdnUrls(platform, nsuid, hashes, squareHash);
 
     const imgRes = await fetch(cdn.upload);
     if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);

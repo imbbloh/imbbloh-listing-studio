@@ -203,8 +203,9 @@ function buildCdnUrls(platform, nsuid, hashes) {
   const base     = 'https://assets.nintendo.com/image/upload';
   const mainPath = `store/software/${platform}/${nsuid}/${hashes[0]}`;
   return {
-    upload:         `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
-    coverUrl:       `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,
+    upload:          `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
+    coverUrl:        `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,
+    squareCoverUrl:  `${base}/q_auto/f_auto/${mainPath}`,
     screenshotUrls: hashes.map(h =>
       `${base}/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_1.5/store/software/${platform}/${nsuid}/${h}`
     )
@@ -505,7 +506,7 @@ app.post('/', async (req, res) => {
     const svg = buildThumbnailSvg(gameTitle, coverBase64, FRAME_BASE64, FONT_BASE64);
     const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
 
-    res.json({ thumbnailDataUrl, coverUrl: cdn.coverUrl, screenshotUrls: cdn.screenshotUrls });
+    res.json({ thumbnailDataUrl, coverUrl: cdn.coverUrl, squareCoverUrl: cdn.squareCoverUrl, screenshotUrls: cdn.screenshotUrls });
 
   } catch (err) {
     res.status(500).json({ error: err.message });

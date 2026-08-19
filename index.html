@@ -1361,12 +1361,13 @@ el('thumbBtn').addEventListener('click', async function() {
 
       btn.textContent = 'Building thumbnail…';
       curSvg = null;
-      curImageUrls = { coverUrl: cData.coverUrl, screenshotUrls: [] };
+      var cEffectiveCoverUrl = (codeSub === 'full' && cData.squareCoverUrl) ? cData.squareCoverUrl : cData.coverUrl;
+      curImageUrls = { coverUrl: cEffectiveCoverUrl, screenshotUrls: [] };
 
       // Fetch code frame + cover art as blobs (blob URLs don't taint canvas)
       var cPlatArg = platSel || 'ns12';
       var cFrameBlob  = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cPlatArg).then(function(r) { if (!r.ok) throw new Error('Frame not found'); return r.blob(); });
-      var cCoverBlob  = await fetch(THUMB_WORKER + '/download?url=' + encodeURIComponent(cData.coverUrl)).then(function(r) { if (!r.ok) throw new Error('Cover fetch failed'); return r.blob(); });
+      var cCoverBlob  = await fetch(THUMB_WORKER + '/download?url=' + encodeURIComponent(cEffectiveCoverUrl)).then(function(r) { if (!r.ok) throw new Error('Cover fetch failed'); return r.blob(); });
 
       var cFrameBlobUrl = URL.createObjectURL(cFrameBlob);
       var cCoverBlobUrl = URL.createObjectURL(cCoverBlob);

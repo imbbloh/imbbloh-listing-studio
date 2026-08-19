@@ -1247,10 +1247,16 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
     coverImg.src = coverBlobUrl;
   });
   var areaX = area[0], areaY = area[1], areaW = area[2], areaH = area[3];
-  // Full game: cover/fill width so square box art reaches all four edges.
-  // Slight height overflow is hidden behind the frame's opaque header/footer.
-  // DLC / Upgrade: width-fill (wide landscape art, frame masks vertical overflow).
-  var scale = areaW / coverImg.width;
+  // Full game: fill box with white first so any gaps around the contained image
+  // appear white (matching the border) rather than red.
+  // DLC / Upgrade: width-fill, frame masks overflow — no white fill needed.
+  if (codeSub === 'full') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(areaX - 20, areaY - 20, areaW + 40, areaH + 40);
+  }
+  var scale = codeSub === 'full'
+    ? Math.min(areaW / coverImg.width, areaH / coverImg.height)
+    : areaW / coverImg.width;
   var w = coverImg.width * scale;
   var h = coverImg.height * scale;
   ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);

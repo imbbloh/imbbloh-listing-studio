@@ -1230,7 +1230,7 @@ async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
 async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
   // [areaX, areaY, areaW, areaH] — inner transparent region for each frame type
   var areas = {
-    full:    [75, 185, 930, 760],  // transparent interior of the full-game white box
+    full:    [75, 163, 930, 782],  // transparent interior of the full-game white box
     dlc:     [60, 455, 950, 490],
     upgrade: [60, 455, 950, 490]
   };
@@ -1252,7 +1252,7 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
   // DLC / Upgrade: width-fill, frame masks overflow — no white fill needed.
   if (codeSub === 'full') {
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(areaX - 20, areaY - 20, areaW + 40, areaH + 40);
+    ctx.fillRect(areaX, areaY, areaW, areaH);
   }
   var scale = codeSub === 'full'
     ? Math.min(areaW / coverImg.width, areaH / coverImg.height)

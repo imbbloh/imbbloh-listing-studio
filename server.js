@@ -466,6 +466,30 @@ async function findDlcUrl(dlcTitle) {
   return null;
 }
 
+// GET /debug-ns?url=...  — dumps hash extraction results for a Nintendo store URL (temporary debug tool)
+app.get('/debug-ns', async (req, res) => {
+  const url = (req.query.url || '').trim();
+  if (!url) return res.status(400).json({ error: 'Missing url' });
+  try {
+    const fullUrl = url.startsWith('http') ? url : 'https://' + url;
+    const r = await fetch(fullUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' }
+    });
+    if (!r.ok) return res.status(502).json({ error: 'Fetch failed: ' + r.status });
+    const html = await r.text();
+    const { platform, nsuid, hashes, squareHash } = extractNintendoAssets(html);
+    // Return context snippets for each hash (50 chars before/after)
+    const contexts = {};
+    for (const h of hashes) {
+      const idx = html.indexOf(h);
+      if (idx >= 0) contexts[h] = html.slice(Math.max(0, idx - 80), idx + h.length + 80).replace(/\s+/g, ' ');
+    }
+    res.json({ platform, nsuid, hashes, squareHash, contexts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /dlc-url?title=...  — resolves the Nintendo eShop URL for a DLC title
 app.get('/dlc-url', async (req, res) => {
   const title = (req.query.title || '').trim();

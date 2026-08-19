@@ -1317,32 +1317,43 @@ el('thumbBtn').addEventListener('click', async function() {
   // ── Code mode: cover art + code frame composite, no title text ────────────
   if (appMode === 'code') {
     try {
-      // Auto-generate Nintendo store URL (codes are always NS)
       var cName = cleanTitle(el('gameName').value.trim());
-      var cSlug = cName.normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/[™®©]/g, '')
-        .replace(/\s*[–—]\s*/g, '-').replace(/:/g, '')
-        .replace(/!/g, '').replace(/&/g, 'and').replace(/\+/g, 'plus')
-        .replace(/\.(\d)/g, '-$1').replace(/\./g, '')
-        .toLowerCase().trim().replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
-      // Always try NS2 URL first; fall back to NS1 if not found
-      var cStoreUrlNs2 = 'www.nintendo.com/us/store/products/' + cSlug + '-switch-2/';
-      var cStoreUrlNs1 = 'www.nintendo.com/us/store/products/' + cSlug + '-switch/';
+
+      // ── Resolve Nintendo store URL ─────────────────────────────────────────
+      // DLC: product ID is embedded in the URL — must scrape the base game page.
+      // Full game / Upgrade: guess slug; try NS2 first, fall back to NS1.
+      btn.textContent = 'Resolving store URL…';
+      var cStoreUrl;
+      if (codeSub === 'dlc') {
+        var dlcRes = await fetch(THUMB_WORKER + '/dlc-url?title=' + encodeURIComponent(cName));
+        var dlcData = await dlcRes.json();
+        if (!dlcRes.ok) throw new Error(dlcData.error || 'Could not resolve DLC URL');
+        cStoreUrl = dlcData.url;
+      } else {
+        var cSlug = cName.normalize('NFD').replace(/[̀-ͯ]/g, '')
+          .replace(/[™®©]/g, '')
+          .replace(/\s*[–—]\s*/g, '-').replace(/:/g, '')
+          .replace(/!/g, '').replace(/&/g, 'and').replace(/\+/g, 'plus')
+          .replace(/\.(\d)/g, '-$1').replace(/\./g, '')
+          .toLowerCase().trim().replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+        cStoreUrl = 'www.nintendo.com/us/store/products/' + cSlug + '-switch-2/';
+      }
 
       btn.textContent = 'Fetching cover…';
       var cRes = await fetch(THUMB_WORKER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeUrl: cStoreUrlNs2, gameTitle: cName })
+        body: JSON.stringify({ storeUrl: cStoreUrl, gameTitle: cName })
       });
       var cData = await cRes.json();
-      if (!cRes.ok && platSel !== 'ns2') {
-        // NS2 URL failed — retry with NS1
+      // For non-DLC, fall back to NS1 URL if NS2 not found
+      if (!cRes.ok && codeSub !== 'dlc' && platSel !== 'ns2') {
+        var cSlugFb = cStoreUrl.replace('-switch-2/', '-switch/');
         cRes = await fetch(THUMB_WORKER, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storeUrl: cStoreUrlNs1, gameTitle: cName })
+          body: JSON.stringify({ storeUrl: cSlugFb, gameTitle: cName })
         });
         cData = await cRes.json();
       }

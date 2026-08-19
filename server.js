@@ -367,6 +367,106 @@ app.get('/debug-ps', async (req, res) => {
   }
 });
 
+// ── DLC URL resolver ───────────────────────────────────────────────────────
+// Nintendo DLC pages embed a product ID in the URL that can't be guessed from
+// the title alone.  We resolve it by scraping the base game's store page (and
+// optionally its /dlc/ subpage) and matching links against the pack slug —
+// ported directly from the Apps Script findDlcUrl() in Code.gs.
+
+const DLC_MARKER_PHRASES = [
+  'expansion pass', 'season pass', 'ultimate pass', 'upgrade pack', 'content pack',
+  'character pass', 'bonus pack', 'dlc pack', 'story pack',
+  'pass vol', 'pack vol', 'add-on pass', 'expansion pack',
+];
+
+function slugifyDlc(s) {
+  return String(s).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/−/g, '')          // U+2212 MINUS SIGN
+    .replace(/[™®'']/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function baseGameCandidates(dlcTitle) {
+  const t = String(dlcTitle).replace(/\s*\(dlc\)\s*$/i, '').trim();
+  const candidates = [];
+  [/:\s*/, /\s+[––]\s+/, /\s+-\s+/].forEach(sep => {
+    const parts = t.split(sep);
+    if (parts.length >= 2) candidates.push({ base: parts[0].trim(), pack: parts.slice(1).join(' ').trim() });
+  });
+  DLC_MARKER_PHRASES.forEach(phrase => {
+    const re = new RegExp('(?:year\\s+\\d+\\s+|vol\\.?\\s*\\d+\\s+)?' + phrase, 'i');
+    const m = t.match(re);
+    if (m && m.index > 0) candidates.push({ base: t.slice(0, m.index).trim(), pack: t.slice(m.index).trim() });
+  });
+  const forMatch = t.match(/^(.*?)\s+DLC\s+for\s+(.+)$/i);
+  if (forMatch) candidates.push({ base: forMatch[2].trim(), pack: forMatch[1].trim() });
+  const cleaned = t.replace(/[––——−]/g, ' ').replace(/[,:]/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = cleaned.split(' ');
+  for (let n = 2; n <= Math.min(6, words.length - 1); n++) {
+    candidates.push({ base: words.slice(0, n).join(' '), pack: words.slice(n).join(' ') });
+  }
+  return candidates;
+}
+
+function packSlugMatches(hrefSlug, packSlug) {
+  if (hrefSlug.includes(packSlug)) return true;
+  const bare = packSlug.replace(/-(vol|volume|part)-1$/, '');
+  if (bare !== packSlug && hrefSlug.includes(bare) && !/-(vol|volume|part)-\d+/.test(hrefSlug)) return true;
+  return false;
+}
+
+async function findDlcUrl(dlcTitle) {
+  const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+  for (const { base, pack } of baseGameCandidates(dlcTitle)) {
+    const baseSlug = slugifyDlc(base);
+    const packSlug = slugifyDlc(pack);
+    if (!packSlug) continue;
+    for (const suf of ['-switch-2/', '-switch/']) {
+      const pagesToTry = [
+        'https://www.nintendo.com/us/store/products/' + baseSlug + suf,
+        'https://www.nintendo.com/us/store/products/' + baseSlug + suf + 'dlc/',
+      ];
+      for (const pageUrl of pagesToTry) {
+        let html;
+        try {
+          const r = await fetch(pageUrl, { headers: { 'User-Agent': UA } });
+          if (!r.ok) continue;
+          html = await r.text();
+        } catch (e) { continue; }
+        const re = /href="(\/us\/store\/products\/[^"]+)"/g;
+        const seen = new Set();
+        let m;
+        while ((m = re.exec(html)) !== null) {
+          const href = m[1];
+          if (seen.has(href)) continue;
+          seen.add(href);
+          if (/(\/|#)dlc\/?$/i.test(href)) continue;
+          if (packSlugMatches(slugifyDlc(href), packSlug)) {
+            return 'https://www.nintendo.com' + href;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// GET /dlc-url?title=...  — resolves the Nintendo eShop URL for a DLC title
+app.get('/dlc-url', async (req, res) => {
+  const title = (req.query.title || '').trim();
+  if (!title) return res.status(400).json({ error: 'Missing title' });
+  try {
+    const url = await findDlcUrl(title);
+    if (!url) return res.status(404).json({ error: 'Could not resolve DLC URL for: ' + title });
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/', async (req, res) => {
   const { storeUrl, gameTitle } = req.body || {};
   if (!storeUrl || !gameTitle) {

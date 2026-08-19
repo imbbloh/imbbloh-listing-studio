@@ -137,12 +137,19 @@ function extractNintendoAssets(html) {
     matches.filter(m => m[1] === platform && m[2] === nsuid).map(m => m[3])
   )].slice(0, 10);
 
-  // Look for the square box art hash: Nintendo CDN URLs that appear WITHOUT the ar_16:9
-  // landscape transform (q_auto/f_auto prefix) are natural-aspect-ratio box art images.
+  // Box art uses the simple q_auto/f_auto URL format.
+  // Key art and screenshots use q_auto:best/f_auto/dpr_N.N — exclude those hashes.
+  const sqHashes = new Set(
+    [...html.matchAll(/q_auto\/f_auto\/store\/software\/(switch2?)\/(\d{14})\/([a-zA-Z0-9_-]{20,})/g)]
+      .filter(m => m[1] === platform && m[2] === nsuid).map(m => m[3])
+  );
+  const hiHashes = new Set(
+    [...html.matchAll(/q_auto:best\/f_auto\/[^/]+\/store\/software\/(switch2?)\/(\d{14})\/([a-zA-Z0-9_-]{20,})/g)]
+      .filter(m => m[1] === platform && m[2] === nsuid).map(m => m[3])
+  );
   let squareHash = null;
-  const sqRe = /q_auto\/f_auto\/store\/software\/(switch2?)\/(\d{14})\/([a-zA-Z0-9_-]{20,})/g;
-  for (const m of html.matchAll(sqRe)) {
-    if (m[1] === platform && m[2] === nsuid) { squareHash = m[3]; break; }
+  for (const h of sqHashes) {
+    if (!hiHashes.has(h)) { squareHash = h; break; }
   }
   console.log('[NS] platform:', platform, 'nsuid:', nsuid, 'hashes:', hashes, 'squareHash:', squareHash);
 

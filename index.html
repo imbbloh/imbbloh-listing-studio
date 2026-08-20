@@ -1262,10 +1262,17 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
     ctx.beginPath();
     ctx.rect(areaX, areaY, areaW, areaH);
     ctx.clip();
-    var scale = Math.min(areaW / coverImg.width, areaH / coverImg.height);
+    // Width-fill: image touches left/right border. Any tiny vertical overflow
+    // (~4-5px for 16:9 in this box) is clipped cleanly by the canvas clip region.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(areaX, areaY, areaW, areaH);
+    ctx.clip();
+    var scale = areaW / coverImg.width;
     var w = coverImg.width * scale;
     var h = coverImg.height * scale;
-    ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);
+    ctx.drawImage(coverImg, areaX, areaY + (areaH - h) / 2, w, h);
+    ctx.restore();
     ctx.restore();
   }
   var frameImg = new Image();

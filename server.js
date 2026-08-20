@@ -152,12 +152,26 @@ function extractNintendoAssets(html) {
     if (!hiHashes.has(h)) { squareHash = h; break; }
   }
 
-  // NS1 box art lives on atum-img CDN, accessed via Cloudinary fetch proxy
+  // NS1 box art lives on atum-img CDN, accessed via Cloudinary fetch proxy.
+  // Anchor to og:image first — it always refers to the current game, not related games.
   let atumCoverUrl = null;
-  const atumRe = /atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g;
-  const atumMatch = atumRe.exec(html);
-  if (atumMatch) {
-    atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${atumMatch[1]}`;
+  const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]*atum-img-lp1\.cdn\.nintendo\.net[^"]*)"/i)
+                || html.match(/<meta[^>]+content="([^"]*atum-img-lp1\.cdn\.nintendo\.net[^"]*)"[^>]+property="og:image"/i);
+  if (ogMatch) {
+    // og:image may already be a full fetch URL or a bare atum URL — normalise to our fetch proxy form
+    const raw = ogMatch[1];
+    const hashMatch = raw.match(/atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/);
+    if (hashMatch) {
+      atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${hashMatch[1]}`;
+    }
+  }
+  // Fallback: look for atum-img in Cloudinary fetch wrappers already in the page (reliable; raw atum URLs in img tags not used)
+  if (!atumCoverUrl) {
+    const fetchRe = /image\/fetch[^"']*atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g;
+    const fetchMatch = fetchRe.exec(html);
+    if (fetchMatch) {
+      atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${fetchMatch[1]}`;
+    }
   }
 
   console.log('[NS] platform:', platform, 'nsuid:', nsuid, 'hashes:', hashes, 'squareHash:', squareHash, 'atumCoverUrl:', atumCoverUrl);

@@ -152,25 +152,26 @@ function extractNintendoAssets(html) {
     if (!hiHashes.has(h)) { squareHash = h; break; }
   }
 
-  // NS1 box art lives on atum-img CDN, accessed via Cloudinary fetch proxy.
-  // Anchor to og:image first — it always refers to the current game, not related games.
+  // NS1 box art lives on atum-img CDN. All atum URLs in the page body are
+  // recommendation-carousel images (class="UBTQd"), NOT the current product.
+  // The current product's box art appears in __NEXT_DATA__ or in non-carousel markup.
   let atumCoverUrl = null;
-  const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]*atum-img-lp1\.cdn\.nintendo\.net[^"]*)"/i)
-                || html.match(/<meta[^>]+content="([^"]*atum-img-lp1\.cdn\.nintendo\.net[^"]*)"[^>]+property="og:image"/i);
-  if (ogMatch) {
-    // og:image may already be a full fetch URL or a bare atum URL — normalise to our fetch proxy form
-    const raw = ogMatch[1];
-    const hashMatch = raw.match(/atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/);
-    if (hashMatch) {
-      atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${hashMatch[1]}`;
+
+  // Strategy 1: __NEXT_DATA__ JSON blob — product-specific, no recommendation data
+  const nextScriptMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (nextScriptMatch) {
+    const atumInNext = nextScriptMatch[1].match(/atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/);
+    if (atumInNext) {
+      atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${atumInNext[1]}`;
     }
   }
-  // Fallback: look for atum-img in Cloudinary fetch wrappers already in the page (reliable; raw atum URLs in img tags not used)
+
+  // Strategy 2: atum URL outside the UBTQd recommendation carousel
   if (!atumCoverUrl) {
-    const fetchRe = /image\/fetch[^"']*atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g;
-    const fetchMatch = fetchRe.exec(html);
-    if (fetchMatch) {
-      atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${fetchMatch[1]}`;
+    const htmlNoCarousel = html.replace(/<img[^>]*class="[^"]*UBTQd[^"]*"[^>]*\/?>/g, '');
+    const atumNoCarousel = htmlNoCarousel.match(/atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/);
+    if (atumNoCarousel) {
+      atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${atumNoCarousel[1]}`;
     }
   }
 
@@ -516,19 +517,26 @@ app.get('/debug-ns', async (req, res) => {
       const idx = html.indexOf(h);
       if (idx >= 0) contexts[h] = html.slice(Math.max(0, idx - 80), idx + h.length + 80).replace(/\s+/g, ' ');
     }
-    // Dump all atum-img occurrences with context so we can see which belong to the main game
-    const atumAll = [];
-    const atumRe2 = /atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g;
-    let am;
-    while ((am = atumRe2.exec(html)) !== null) {
-      atumAll.push({ hash: am[1], context: html.slice(Math.max(0, am.index - 120), am.index + am[0].length + 120).replace(/\s+/g, ' ') });
-      if (atumAll.length >= 10) break;
-    }
     // og:image
     const ogM = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
              || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
     const ogImage = ogM ? ogM[1] : null;
-    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, ogImage, atumAll, contexts });
+
+    // All atum-img occurrences with position + context (no cap)
+    const atumAll = [];
+    const atumRe2 = /atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g;
+    let am;
+    while ((am = atumRe2.exec(html)) !== null) {
+      atumAll.push({ pos: am.index, hash: am[1], context: html.slice(Math.max(0, am.index - 120), am.index + am[0].length + 120).replace(/\s+/g, ' ') });
+    }
+
+    // __NEXT_DATA__ atum search
+    const ndMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    const atumInNextData = ndMatch
+      ? (ndMatch[1].match(/atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g) || []).slice(0, 5)
+      : null;
+
+    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, ogImage, atumAll, atumInNextData, contexts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

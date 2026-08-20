@@ -219,11 +219,14 @@ function buildCodeThumbnailSvg(gameTitle, frameBase64, fontBase64) {
 function buildCdnUrls(platform, nsuid, hashes, squareHash) {
   const base       = 'https://assets.nintendo.com/image/upload';
   const mainPath   = `store/software/${platform}/${nsuid}/${hashes[0]}`;
-  const squarePath = `store/software/${platform}/${nsuid}/${squareHash || hashes[0]}`;
+  // If no dedicated square box-art hash found, force a 1:1 smart-fill crop of the key art.
+  const squareCoverUrl = squareHash
+    ? `${base}/q_auto/f_auto/store/software/${platform}/${nsuid}/${squareHash}`
+    : `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
   return {
     upload:          `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
     coverUrl:        `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,
-    squareCoverUrl:  `${base}/q_auto/f_auto/${squarePath}`,
+    squareCoverUrl,
     screenshotUrls: hashes.map(h =>
       `${base}/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_1.5/store/software/${platform}/${nsuid}/${h}`
     )

@@ -151,9 +151,18 @@ function extractNintendoAssets(html) {
   for (const h of sqHashes) {
     if (!hiHashes.has(h)) { squareHash = h; break; }
   }
-  console.log('[NS] platform:', platform, 'nsuid:', nsuid, 'hashes:', hashes, 'squareHash:', squareHash);
 
-  return { platform, nsuid, hashes, squareHash };
+  // NS1 box art lives on atum-img CDN, accessed via Cloudinary fetch proxy
+  let atumCoverUrl = null;
+  const atumRe = /atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g;
+  const atumMatch = atumRe.exec(html);
+  if (atumMatch) {
+    atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${atumMatch[1]}`;
+  }
+
+  console.log('[NS] platform:', platform, 'nsuid:', nsuid, 'hashes:', hashes, 'squareHash:', squareHash, 'atumCoverUrl:', atumCoverUrl);
+
+  return { platform, nsuid, hashes, squareHash, atumCoverUrl };
 }
 
 function extractPsAssets(html) {
@@ -216,13 +225,12 @@ function buildCodeThumbnailSvg(gameTitle, frameBase64, fontBase64) {
 </svg>`;
 }
 
-function buildCdnUrls(platform, nsuid, hashes, squareHash) {
+function buildCdnUrls(platform, nsuid, hashes, squareHash, atumCoverUrl) {
   const base       = 'https://assets.nintendo.com/image/upload';
   const mainPath   = `store/software/${platform}/${nsuid}/${hashes[0]}`;
-  // If no dedicated square box-art hash found, force a 1:1 smart-fill crop of the key art.
   const squareCoverUrl = squareHash
     ? `${base}/q_auto/f_auto/store/software/${platform}/${nsuid}/${squareHash}`
-    : `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
+    : atumCoverUrl || `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
   return {
     upload:          `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
     coverUrl:        `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,
@@ -487,14 +495,14 @@ app.get('/debug-ns', async (req, res) => {
     });
     if (!r.ok) return res.status(502).json({ error: 'Fetch failed: ' + r.status });
     const html = await r.text();
-    const { platform, nsuid, hashes, squareHash } = extractNintendoAssets(html);
+    const { platform, nsuid, hashes, squareHash, atumCoverUrl } = extractNintendoAssets(html);
     // Return context snippets for each hash (50 chars before/after)
     const contexts = {};
     for (const h of hashes) {
       const idx = html.indexOf(h);
       if (idx >= 0) contexts[h] = html.slice(Math.max(0, idx - 80), idx + h.length + 80).replace(/\s+/g, ' ');
     }
-    res.json({ platform, nsuid, hashes, squareHash, contexts });
+    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, contexts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -541,8 +549,8 @@ app.post('/', async (req, res) => {
       return res.json({ thumbnailDataUrl, coverUrl, screenshotUrls });
     }
 
-    const { platform, nsuid, hashes, squareHash } = extractNintendoAssets(html);
-    const cdn = buildCdnUrls(platform, nsuid, hashes, squareHash);
+    const { platform, nsuid, hashes, squareHash, atumCoverUrl } = extractNintendoAssets(html);
+    const cdn = buildCdnUrls(platform, nsuid, hashes, squareHash, atumCoverUrl);
 
     const imgRes = await fetch(cdn.upload);
     if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);

@@ -1124,6 +1124,13 @@ el('gameName').addEventListener('input', function() {
     if (codeSub !== 'upgrade') setSub('upgrade');
     if (platSel  !== 'ns2')   setPlatform('ns2');
   }
+  if (/nintendo switch 2 edition/i.test(this.value)) {
+    if (platSel !== 'ns2') {
+      if (platSel) el('p-' + platSel).classList.remove('sel');
+      platSel = 'ns2';
+      el('p-ns2').classList.add('sel');
+    }
+  }
 });
 el('gameName').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') doGenerate();

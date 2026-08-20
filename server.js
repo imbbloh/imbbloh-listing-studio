@@ -510,13 +510,25 @@ app.get('/debug-ns', async (req, res) => {
     if (!r.ok) return res.status(502).json({ error: 'Fetch failed: ' + r.status });
     const html = await r.text();
     const { platform, nsuid, hashes, squareHash, atumCoverUrl } = extractNintendoAssets(html);
-    // Return context snippets for each hash (50 chars before/after)
+    // Return context snippets for each hash
     const contexts = {};
     for (const h of hashes) {
       const idx = html.indexOf(h);
       if (idx >= 0) contexts[h] = html.slice(Math.max(0, idx - 80), idx + h.length + 80).replace(/\s+/g, ' ');
     }
-    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, contexts });
+    // Dump all atum-img occurrences with context so we can see which belong to the main game
+    const atumAll = [];
+    const atumRe2 = /atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g;
+    let am;
+    while ((am = atumRe2.exec(html)) !== null) {
+      atumAll.push({ hash: am[1], context: html.slice(Math.max(0, am.index - 120), am.index + am[0].length + 120).replace(/\s+/g, ' ') });
+      if (atumAll.length >= 10) break;
+    }
+    // og:image
+    const ogM = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+             || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+    const ogImage = ogM ? ogM[1] : null;
+    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, ogImage, atumAll, contexts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

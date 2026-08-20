@@ -152,21 +152,23 @@ function extractNintendoAssets(html) {
     if (!hiHashes.has(h)) { squareHash = h; break; }
   }
 
-  // NS1 box art lives on atum-img CDN. All atum URLs in the page body are
-  // recommendation-carousel images (class="UBTQd"), NOT the current product.
-  // The current product's box art appears in __NEXT_DATA__ or in non-carousel markup.
+  // NS1 box art lives on atum-img CDN. The page embeds 40+ related-game atum URLs
+  // before the current product's entry in the Apollo/__NEXT_DATA__ cache.
+  // The current product's atum entry is uniquely followed by "publisherNotifications"
+  // (related-game entries are followed by "qtyAllowedPerCustomer" / "releaseDate").
   let atumCoverUrl = null;
 
-  // Strategy 1: __NEXT_DATA__ JSON blob — product-specific, no recommendation data
   const nextScriptMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (nextScriptMatch) {
-    const atumInNext = nextScriptMatch[1].match(/atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/);
-    if (atumInNext) {
-      atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${atumInNext[1]}`;
+    // Match the atum hash whose Apollo cache entry contains main-product-only fields
+    const mainProdRe = /atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)"},"(?:publisherNotifications|relatedArticles|downloadableContent)/;
+    const mainM = mainProdRe.exec(nextScriptMatch[1]);
+    if (mainM) {
+      atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${mainM[1]}`;
     }
   }
 
-  // Strategy 2: atum URL outside the UBTQd recommendation carousel
+  // Fallback: atum URL outside the UBTQd recommendation carousel in the HTML body
   if (!atumCoverUrl) {
     const htmlNoCarousel = html.replace(/<img[^>]*class="[^"]*UBTQd[^"]*"[^>]*\/?>/g, '');
     const atumNoCarousel = htmlNoCarousel.match(/atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/);

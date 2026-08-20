@@ -1231,8 +1231,8 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
   // [areaX, areaY, areaW, areaH] — inner transparent region for each frame type
   var areas = {
     full:    [75, 163, 930, 782],  // transparent interior of the full-game white box
-    dlc:     [75, 405, 930, 480],
-    upgrade: [75, 405, 930, 480]
+    dlc:     [60, 455, 950, 490],
+    upgrade: [60, 455, 950, 490]
   };
   var area = areas[codeSub] || areas['full'];
   var canvas = document.createElement('canvas');
@@ -1262,10 +1262,10 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
     ctx.beginPath();
     ctx.rect(areaX, areaY, areaW, areaH);
     ctx.clip();
-    var scale = Math.min(areaW / coverImg.width, areaH / coverImg.height);
+    var scale = (areaW / coverImg.width) * 0.95;
     var w = coverImg.width * scale;
     var h = coverImg.height * scale;
-    ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);
+    ctx.drawImage(coverImg, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2 - 15, w, h);
     ctx.restore();
   }
   var frameImg = new Image();

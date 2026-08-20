@@ -1247,22 +1247,18 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
     coverImg.src = coverBlobUrl;
   });
   var areaX = area[0], areaY = area[1], areaW = area[2], areaH = area[3];
-  // Full game: fill box with white first so any gaps around the contained image
-  // appear white (matching the border) rather than red.
-  // DLC / Upgrade: width-fill, frame masks overflow — no white fill needed.
-  if (codeSub === 'full') {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(areaX, areaY, areaW, areaH);
-  }
-  var scale = codeSub === 'full'
-    ? Math.min(areaW / coverImg.width, areaH / coverImg.height)
-    : areaW / coverImg.width;
+  // Fill box with white so any gaps appear white (matching the border) rather than red.
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(areaX, areaY, areaW, areaH);
+  // Contain the image within the box — no crop, no overflow.
+  var scale = Math.min(areaW / coverImg.width, areaH / coverImg.height);
   var w = coverImg.width * scale;
   var h = coverImg.height * scale;
-  // Full game: top-align so cover touches the top border; white fill covers any bottom gap.
-  // DLC/Upgrade: centre vertically (width-fill, frame hides overflow).
+  // Full game: top-align so cover touches the top border.
+  // DLC/Upgrade: centre both axes within the box.
+  var drawX = areaX + (areaW - w) / 2;
   var drawY = codeSub === 'full' ? areaY : areaY + (areaH - h) / 2;
-  ctx.drawImage(coverImg, areaX + (areaW - w) / 2, drawY, w, h);
+  ctx.drawImage(coverImg, drawX, drawY, w, h);
   var frameImg = new Image();
   await new Promise(function(resolve, reject) {
     frameImg.onload = resolve;

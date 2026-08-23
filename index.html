@@ -879,6 +879,7 @@ function showOutput(txt) {
   curCopy = txt;
   el('outputText').textContent = txt;
   el('outputCard').classList.add('visible');
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).catch(function() {});
   el('syncRow').style.display = 'none';
   el('saveBtn').disabled = false;
   el('saveBtn').textContent = '\u2191 Save to Sheets';

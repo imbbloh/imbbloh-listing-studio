@@ -1125,7 +1125,7 @@ el('gameName').addEventListener('input', function() {
     if (codeSub !== 'upgrade') setSub('upgrade');
     if (platSel  !== 'ns2')   setPlatform('ns2');
   }
-  if (/nintendo switch[^a-z0-9]*2 edition/i.test(this.value)) {
+  if (/nintendo\s+switch\S*\s+2\s+edition/i.test(this.value)) {
     if (platSel !== 'ns2') setPlatform('ns2');
   }
 });

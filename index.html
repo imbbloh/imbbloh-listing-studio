@@ -850,7 +850,7 @@ function genCode(name) {
       bl + '\n\n' +
       '\uD83D\uDD39DLC: ' + name + ' - $' + price + '\n\n' +
       footer +
-      'Tags: ' + tag + ' DLC ' + name;
+      'Tags: ' + tag + ' DLC ' + name + ' ' + price;
 
   } else if (codeSub === 'upgrade') {
     var upgradeBaseName = name.replace(/\s*Upgrade Pack\s*$/i, '');
@@ -860,7 +860,7 @@ function genCode(name) {
       bl + '\n\n' +
       '\uD83D\uDD39 Upgrade Pack: Nintendo Switch 2 Edition - $' + price + '\n\n' +
       footer +
-      'Tags: ' + tag + ' ' + name;
+      'Tags: ' + tag + ' ' + name + ' ' + price;
 
   } else {
     txt =
@@ -868,7 +868,7 @@ function genCode(name) {
       name + ' \u2013 Digital Game Code\n\n' +
       bl + '\n\n' +
       footer +
-      'Tags: ' + tag + ' ' + name;
+      'Tags: ' + tag + ' ' + name + ' ' + price;
   }
 
   showOutput(txt);

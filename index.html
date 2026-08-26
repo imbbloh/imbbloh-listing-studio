@@ -1123,10 +1123,10 @@ el('gameName').addEventListener('input', function() {
   if (appMode === 'game') autoUrl();
   if (appMode === 'code' && /upgrade pack/i.test(this.value)) {
     if (codeSub !== 'upgrade') setSub('upgrade');
-    if (platSel  !== 'ns2')   setPlatform('ns2');
+    if (platSel  !== 'ns2')   setPlat('ns2');
   }
   if (/nintendo\s+switch\S*\s+2\s+edition/i.test(this.value)) {
-    if (platSel !== 'ns2') setPlatform('ns2');
+    if (platSel !== 'ns2') setPlat('ns2');
   }
 });
 el('gameName').addEventListener('keydown', function(e) {

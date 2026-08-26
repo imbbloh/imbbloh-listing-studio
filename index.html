@@ -528,8 +528,9 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
       <label>Edit Title</label>
       <input type="text" id="thumbTitle" autocomplete="off" autocorrect="off" spellcheck="false">
     </div>
-    <div style="margin-bottom:12px">
-      <button class="btn-thumb" id="thumbDownloadAllBtn">⬇ Download All Images</button>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn-thumb" id="thumbDownloadAllBtn" style="flex:1">⬇ Download All Images</button>
+      <button class="btn-save" id="saveBtnThumb" style="flex:1">↑ Save to Sheets</button>
     </div>
     <div style="margin-bottom:12px;padding:12px 0 0;border-top:1px solid var(--border)">
       <label style="display:block;font-size:0.72rem;font-weight:500;color:var(--muted);margin-bottom:6px">Carousell Bot — Price</label>
@@ -883,6 +884,8 @@ function showOutput(txt) {
   el('syncRow').style.display = 'none';
   el('saveBtn').disabled = false;
   el('saveBtn').textContent = '\u2191 Save to Sheets';
+  el('saveBtnThumb').disabled = false;
+  el('saveBtnThumb').textContent = '\u2191 Save to Sheets';
 
   // Thumbnail button \u2014 game mode (NS/PS) or any code subtype
   var showThumb = appMode === 'code' || (appMode === 'game' && (platSel === 'ns12' || platSel === 'ns2' || platSel === 'ps45' || platSel === 'ps5'));
@@ -956,6 +959,8 @@ function doSave() {
 
   el('saveBtn').disabled = true;
   el('saveBtn').textContent = 'Saving...';
+  el('saveBtnThumb').disabled = true;
+  el('saveBtnThumb').textContent = 'Saving...';
 
   var gmap = { ns12: 'Switch 1&2', ns2: 'Switch 2', ps45: 'PS4 & PS5', ps5: 'PS5' };
   var cmap = { ns12: 'Switch 1&2', ns2: 'Switch 2' };
@@ -1004,6 +1009,7 @@ function doSave() {
     el('syncRow').style.display = 'flex';
     el('syncMsg').textContent = 'Saved to Google Sheets \u00b7 ' + item.date;
     el('saveBtn').textContent = '\u2713 Saved!';
+    el('saveBtnThumb').textContent = '\u2713 Saved!';
     showToast('Saved to Google Sheets!');
 
     // Reset after delay
@@ -1025,6 +1031,8 @@ function doSave() {
   } catch (e) {
     el('saveBtn').disabled = false;
     el('saveBtn').textContent = '\u2191 Save to Sheets';
+    el('saveBtnThumb').disabled = false;
+    el('saveBtnThumb').textContent = '\u2191 Save to Sheets';
     showToast('Error \u2014 try again', true);
   }
 }
@@ -1110,8 +1118,9 @@ el('genBtn').addEventListener('click', doGenerate);
 // Copy button
 el('copyBtn').addEventListener('click', doCopy);
 
-// Save button
+// Save buttons (output card + thumbnail card)
 el('saveBtn').addEventListener('click', doSave);
+el('saveBtnThumb').addEventListener('click', doSave);
 
 // Filter pills
 el('filt-all').addEventListener('click', function() { setFilter('all'); });

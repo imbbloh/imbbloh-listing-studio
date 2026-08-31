@@ -1209,11 +1209,16 @@ async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
   ctx.drawImage(frameImg, 0, 0, 1080, 1080);
 
   var fontSize = thumbTitleFontSize(title.length);
-  ctx.fillStyle = 'white';
-  ctx.font = '400 ' + fontSize + 'px "Black Han Sans", Arial, sans-serif';
+  var maxTitleWidth = 1080 - 28 * 2 - 24; // frame rail (28px each side) + 12px padding each side
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+  ctx.font = '400 ' + fontSize + 'px "Black Han Sans", Arial, sans-serif';
+  while (fontSize > 20 && ctx.measureText(title).width > maxTitleWidth) {
+    fontSize -= 1;
+    ctx.font = '400 ' + fontSize + 'px "Black Han Sans", Arial, sans-serif';
+  }
+  ctx.fillStyle = 'white';
   ctx.fillText(title, 540, 1008);
 
   return new Promise(function(resolve, reject) {

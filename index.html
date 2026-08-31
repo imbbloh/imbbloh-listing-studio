@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>imbbloh · Listing Studio</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&family=Black+Han+Sans&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1175,20 +1175,7 @@ var gagalinFontPromise = null;
 
 function loadGagalinFont() {
   if (gagalinFontPromise) return gagalinFontPromise;
-  // Use indexOf/substring instead of regex — more reliable for the 335 KB OTF
-  // base64 string on iOS Safari's JavaScriptCore engine.
-  var fontSrc = THUMB_WORKER + '/font'; // server fallback
-  if (curSvg) {
-    var prefix = "src: url('data:font/otf;base64,";
-    var s = curSvg.indexOf(prefix);
-    if (s !== -1) {
-      s += prefix.length;
-      var e = curSvg.indexOf("')", s);
-      if (e !== -1) fontSrc = 'data:font/otf;base64,' + curSvg.substring(s, e);
-    }
-  }
-  gagalinFontPromise = new FontFace('Gagalin', 'url(' + fontSrc + ')')
-    .load().then(function(f) { document.fonts.add(f); });
+  gagalinFontPromise = document.fonts.load('400 80px "Black Han Sans"').then(function() {});
   return gagalinFontPromise;
 }
 
@@ -1223,7 +1210,7 @@ async function renderCanvasToBlob(title, coverDataUrl, frameDataUrl, bgColor) {
 
   var fontSize = thumbTitleFontSize(title.length);
   ctx.fillStyle = 'white';
-  ctx.font = '900 ' + fontSize + 'px Gagalin, Arial, sans-serif';
+  ctx.font = '400 ' + fontSize + 'px "Black Han Sans", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';

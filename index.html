@@ -1304,17 +1304,35 @@ function thumbEscapeXml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function extractFromCurSvg(prefix, suffix) {
+  if (!curSvg) return null;
+  var s = curSvg.indexOf(prefix);
+  if (s === -1) return null;
+  s += prefix.length;
+  var e = curSvg.indexOf(suffix, s);
+  return e === -1 ? null : curSvg.substring(s, e);
+}
+
+async function renderThumbPreview(title) {
+  var coverB64  = extractFromCurSvg('href="data:image/jpeg;base64,', '"');
+  var frameB64  = extractFromCurSvg('href="data:image/png;base64,', '"');
+  var coverUrl  = coverB64 ? 'data:image/jpeg;base64,' + coverB64 : null;
+  var frameUrl  = frameB64 ? 'data:image/png;base64,' + frameB64 : null;
+  var isPS      = platSel === 'ps45' || platSel === 'ps5';
+  await loadGagalinFont();
+  var blob = await renderCanvasToBlob(title.toUpperCase(), coverUrl, frameUrl, isPS ? '#000000' : '#e8001d');
+  el('thumbPreview').src = URL.createObjectURL(blob);
+}
+
 function applyThumbTitle(title) {
   if (!curSvg) return;
+  // Keep curSvg updated so buildAllBlobs extracts the right title text
   var fs      = thumbTitleFontSize(title.length);
   var escaped = thumbEscapeXml(title.toUpperCase());
-  var updated = curSvg
+  curSvg = curSvg
     .replace(/font-size="\d+"/, 'font-size="' + fs + '"')
     .replace(/(<text[^>]*>)[^<]*(<\/text>)/, '$1' + escaped + '$2');
-  // UTF-8-safe base64 encode
-  var b64 = btoa(unescape(encodeURIComponent(updated)));
-  el('thumbPreview').src = 'data:image/svg+xml;base64,' + b64;
-  curSvg = updated;
+  renderThumbPreview(title).catch(function() {});
 }
 
 el('thumbTitle').addEventListener('input', function() {
@@ -1467,12 +1485,7 @@ el('thumbBtn').addEventListener('click', async function() {
     }
     el('thumbLinks').textContent = links;
 
-    var thumbImg = el('thumbPreview');
-    await new Promise(function(resolve, reject) {
-      thumbImg.onload = resolve;
-      thumbImg.onerror = function() { reject(new Error('Failed to display thumbnail')); };
-      thumbImg.src = data.thumbnailDataUrl;
-    });
+    await renderThumbPreview(gameTitle);
 
     el('thumbCard').style.display = 'block';
     btn.textContent = '✓ Done';

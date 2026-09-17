@@ -1495,7 +1495,10 @@ el('thumbBtn').addEventListener('click', async function() {
 
       btn.textContent = 'Building thumbnail…';
       curSvg = null;
-      var cEffectiveCoverUrl = (codeSub === 'full' && cData.squareCoverUrl) ? cData.squareCoverUrl : cData.coverUrl;
+      // PS code: always use square cover art; NS code: square for full game only
+      var cEffectiveCoverUrl = (cIsPS && cData.squareCoverUrl) ? cData.squareCoverUrl
+        : (codeSub === 'full' && cData.squareCoverUrl) ? cData.squareCoverUrl
+        : cData.coverUrl;
       curImageUrls = { coverUrl: cEffectiveCoverUrl, screenshotUrls: [] };
 
       // Fetch code frame + cover art as blobs (blob URLs don't taint canvas)

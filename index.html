@@ -440,7 +440,7 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <!-- Platform -->
     <div class="form-group">
       <label>Platform</label>
-      <div class="ns-only-note" id="nsOnlyNote">● Nintendo only for Digital Codes</div>
+      <div class="ns-only-note" id="nsOnlyNote">● Upgrade Pack: Nintendo Switch 2 only</div>
       <div class="platform-grid">
         <div class="plat-pill ns-pill" id="p-ns12"><span class="pill-icon">🔴</span>NS1 &amp; NS2</div>
         <div class="plat-pill ns-pill" id="p-ns2"><span class="pill-icon">🔴</span>NS2 Only</div>
@@ -593,6 +593,23 @@ var saved     = JSON.parse(localStorage.getItem('ibl') || '[]');
 // ── DOM refs ───────────────────────────────────────────────────────────────
 function el(id) { return document.getElementById(id); }
 
+// ── Store URL visibility helper ────────────────────────────────────────────
+function updateCodeStoreUrlViz() {
+  var isPS = platSel === 'ps45' || platSel === 'ps5';
+  // Visible in game mode; visible in code mode only when PS platform is selected
+  el('secStoreUrl').style.display = (appMode !== 'code' || isPS) ? 'block' : 'none';
+  if (appMode === 'code') {
+    var lbl = el('secStoreUrl').querySelector('label');
+    if (lbl) {
+      if (isPS) {
+        lbl.innerHTML = 'PlayStation Store URL <span style="color:var(--muted);font-size:0.65rem;font-weight:600">● for thumbnail</span>';
+      } else {
+        lbl.innerHTML = 'Official Store URL <span style="color:var(--green);font-size:0.65rem;font-weight:600">● Auto-generated</span>';
+      }
+    }
+  }
+}
+
 // ── Mode switch ────────────────────────────────────────────────────────────
 function setMode(m) {
   appMode = m;
@@ -607,24 +624,20 @@ function setMode(m) {
   el('secSubtype').style.display   = isCode ? 'block' : 'none';
   el('secGamePrice').style.display = isCode ? 'none'  : 'block';
   el('secCodePrice').style.display = isCode ? 'block' : 'none';
-  el('secStoreUrl').style.display  = isCode ? 'none'  : 'block';
   el('nsOnlyNote').style.display   = isCode ? 'block' : 'none';
 
-  // Dim PS pills in code mode
-  el('p-ps45').classList.toggle('dimmed', isCode);
-  el('p-ps5').classList.toggle('dimmed', isCode);
-
-  // If PS was selected, deselect when switching to code
-  if (isCode && platSel && (platSel === 'ps45' || platSel === 'ps5')) {
-    el('p-' + platSel).classList.remove('sel');
-    platSel = null;
-  }
-
-  // Reset subtype to full when switching to game
+  // Reset subtype to full when switching to game mode
   if (!isCode) {
     setSub('full');
     el('p-ns12').classList.remove('dimmed');
+    // Re-enable upgrade pill
+    el('sub-upgrade').classList.remove('dimmed');
+    el('sub-upgrade').style.opacity = '';
+    el('sub-upgrade').style.pointerEvents = '';
   }
+
+  // Store URL: always visible in game mode; in code mode only when PS platform selected
+  updateCodeStoreUrlViz();
 
   // Reset output
   curCopy = '';
@@ -643,13 +656,18 @@ function setSub(s) {
   });
   el('sub-' + s).classList.add('sub-active');
 
-  // Upgrade Pack = NS2 only
+  // Upgrade Pack = NS2 only — dim NS1&2 and PS pills
   var ns12 = el('p-ns12');
   if (s === 'upgrade') {
     ns12.classList.add('dimmed');
     ns12.style.opacity = '0.25';
     ns12.style.pointerEvents = 'none';
-    // Auto-select NS2
+    ['p-ps45', 'p-ps5'].forEach(function(id) {
+      el(id).classList.add('dimmed');
+      el(id).style.opacity = '0.25';
+      el(id).style.pointerEvents = 'none';
+    });
+    // Auto-select NS2 (switch away from PS if needed)
     if (platSel !== 'ns2') {
       if (platSel) el('p-' + platSel).classList.remove('sel');
       platSel = 'ns2';
@@ -659,15 +677,20 @@ function setSub(s) {
     ns12.classList.remove('dimmed');
     ns12.style.opacity = '';
     ns12.style.pointerEvents = '';
+    ['p-ps45', 'p-ps5'].forEach(function(id) {
+      el(id).classList.remove('dimmed');
+      el(id).style.opacity = '';
+      el(id).style.pointerEvents = '';
+    });
   }
 }
 
 // ── Platform select ────────────────────────────────────────────────────────
 function setPlat(p) {
-  // Block PS in code mode
-  if (appMode === 'code' && (p === 'ps45' || p === 'ps5')) return;
   // Block NS1&2 when upgrade pack selected
   if (codeSub === 'upgrade' && p === 'ns12') return;
+  // Block PS when upgrade pack selected (NS2-only)
+  if (codeSub === 'upgrade' && (p === 'ps45' || p === 'ps5')) return;
   // Block if already selected
   if (platSel === p) return;
 
@@ -675,8 +698,19 @@ function setPlat(p) {
   platSel = p;
   el('p-' + p).classList.add('sel');
 
-  // Auto-generate URL in game mode
   if (appMode === 'game') autoUrl();
+
+  if (appMode === 'code') {
+    var isPS = p === 'ps45' || p === 'ps5';
+    // If switching to PS while Upgrade Pack was on, revert to Full Game
+    if (isPS && codeSub === 'upgrade') setSub('full');
+    // Dim Upgrade Pack for PS platforms (not applicable)
+    el('sub-upgrade').classList.toggle('dimmed', isPS);
+    el('sub-upgrade').style.opacity       = isPS ? '0.3' : '';
+    el('sub-upgrade').style.pointerEvents = isPS ? 'none' : '';
+    // Show/hide store URL field
+    updateCodeStoreUrlViz();
+  }
 }
 
 // ── URL auto-generator ─────────────────────────────────────────────────────
@@ -817,6 +851,16 @@ function genCode(name) {
   var price = el('codePrice').value;
   if (!price) { showToast('Enter a price', true); return; }
 
+  var isPS = platSel === 'ps45' || platSel === 'ps5';
+
+  if (isPS) {
+    genCodePS(name, price);
+  } else {
+    genCodeNS(name, price);
+  }
+}
+
+function genCodeNS(name, price) {
   var bl, tag;
   if (platSel === 'ns12') {
     bl  = '𝐅𝐨𝐫 𝐍𝐢𝐧𝐭𝐞𝐧𝐝𝐨 𝐒𝐰𝐢𝐭𝐜𝐡 𝟐 / 𝐒𝐰𝐢𝐭𝐜𝐡 𝐎𝐋𝐄𝐃 / 𝐒𝐰𝐢𝐭𝐜𝐡 𝟏';
@@ -866,6 +910,52 @@ function genCode(name) {
   } else {
     txt =
       hdrBase + ' [Nintendo Official Digital Codes]\n\n' +
+      name + ' \u2013 Digital Game Code\n\n' +
+      bl + '\n\n' +
+      footer +
+      'Tags: ' + tag + ' ' + name + ' ' + price;
+  }
+
+  showOutput(txt);
+}
+
+function genCodePS(name, price) {
+  var bl, tag, hdrPlat;
+  if (platSel === 'ps45') {
+    bl      = '𝐅𝐨𝐫 𝐏𝐥𝐚𝐲𝐒𝐭𝐚𝐭𝐢𝐨𝐧 𝟒 & 𝟓';
+    tag     = 'PlayStation';
+    hdrPlat = 'PS4 PS5 PlayStation 4 5 PSN';
+  } else {
+    bl      = '𝐅𝐨𝐫 𝐏𝐥𝐚𝐲𝐒𝐭𝐚𝐭𝐢𝐨𝐧 𝟓';
+    tag     = 'PlayStation 5';
+    hdrPlat = 'PS5 PlayStation 5 PSN';
+  }
+
+  var footer =
+    '\u2705 Instant Delivery (within 15 mins)\n' +
+    '\u2705 Code via PlayStation Store (Region-Free)\n' +
+    'SG \uD83C\uDDF8\uD83C\uDDEC | US \uD83C\uDDFA\uD83C\uDDF8 | EU \uD83C\uDDEA\uD83C\uDDFA | HK \uD83C\uDDED\uD83C\uDDF0 | JP \uD83C\uDDEF\uD83C\uDDF5\n\n' +
+    '\uD83D\uDCB3 \uD835\uDC0F\uD835\uDC1A\uD835\uDC32\uD835\uDC26\uD835\uDC1E\uD835\uDC27\uD835\uDC2D \uD835\uDC0E\uD835\uDC29\uD835\uDC2D\uD835\uDC22\uD835\uDC28\uD835\uDC27\uD835\uDC2C\n' +
+    '\u2714\uFE0F PayNow / PayLah / LifeSG Credits\n' +
+    '\u26A0\uFE0F No refund once code sent\n\n' +
+    '\uD83D\uDD17 \uD835\uDC05\uD835\uDC2E\uD835\uDC25\uD835\uDC25 \uD835\uDC06\uD835\uDC1A\uD835\uDC26\uD835\uDC1E \uD835\uDC0B\uD835\uDC22\uD835\uDC2C\uD835\uDC2D:\n' +
+    'imbbloh.github.io/game-catalog/\n\n';
+
+  var hdrBase = '<DIGITAL CODE> ' + name + ' ' + hdrPlat + ' Digital Game Code PSN Redemption Voucher Download Key';
+
+  var txt = '';
+
+  if (codeSub === 'dlc') {
+    txt =
+      hdrBase + ' (DLC) [PlayStation Official Digital Codes]\n\n' +
+      name + ' (DLC) \u2013 Digital Game Code\n\n' +
+      bl + '\n\n' +
+      '\uD83D\uDD39DLC: ' + name + ' - $' + price + '\n\n' +
+      footer +
+      'Tags: ' + tag + ' DLC ' + name + ' ' + price;
+  } else {
+    txt =
+      hdrBase + ' [PlayStation Official Digital Codes]\n\n' +
       name + ' \u2013 Digital Game Code\n\n' +
       bl + '\n\n' +
       footer +
@@ -963,7 +1053,7 @@ function doSave() {
   el('saveBtnThumb').textContent = 'Saving...';
 
   var gmap = { ns12: 'Switch 1&2', ns2: 'Switch 2', ps45: 'PS4 & PS5', ps5: 'PS5' };
-  var cmap = { ns12: 'Switch 1&2', ns2: 'Switch 2' };
+  var cmap = { ns12: 'Switch 1&2', ns2: 'Switch 2', ps45: 'PS4 & PS5', ps5: 'PS5' };
 
   var fd = new FormData();
   var isCode = appMode === 'code';
@@ -1361,28 +1451,36 @@ el('thumbBtn').addEventListener('click', async function() {
 
   // ── Code mode: cover art + code frame composite, no title text ────────────
   if (appMode === 'code') {
+    var cIsPS = platSel === 'ps45' || platSel === 'ps5';
     try {
       var cName = cleanTitle(el('gameName').value.trim());
 
-      // ── Resolve Nintendo store URL ─────────────────────────────────────────
-      // DLC: product ID is embedded in the URL — must scrape the base game page.
-      // Full game / Upgrade: guess slug; try NS2 first, fall back to NS1.
       btn.textContent = 'Resolving store URL…';
       var cStoreUrl;
-      if (codeSub === 'dlc') {
-        var dlcRes = await fetch(THUMB_WORKER + '/dlc-url?title=' + encodeURIComponent(cName));
-        var dlcData = await dlcRes.json();
-        if (!dlcRes.ok) throw new Error(dlcData.error || 'Could not resolve DLC URL');
-        cStoreUrl = dlcData.url;
+
+      if (cIsPS) {
+        // PS code mode: user provides store URL directly
+        cStoreUrl = el('storeUrl').value.trim();
+        if (!cStoreUrl) throw new Error('Enter a PlayStation Store URL to generate the thumbnail');
       } else {
-        var cSlug = cName.normalize('NFD').replace(/[̀-ͯ]/g, '')
-          .replace(/[™®©]/g, '')
-          .replace(/\s*[–—]\s*/g, '-').replace(/:/g, '')
-          .replace(/!/g, '').replace(/&/g, 'and').replace(/\+/g, 'plus')
-          .replace(/\.(\d)/g, '-$1').replace(/\./g, '')
-          .toLowerCase().trim().replace(/\s+/g, '-')
-          .replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
-        cStoreUrl = 'www.nintendo.com/us/store/products/' + cSlug + '-switch-2/';
+        // NS code mode: auto-resolve Nintendo store URL
+        // DLC: product ID is in the URL — must scrape the base game page.
+        // Full game / Upgrade: guess slug; try NS2 first, fall back to NS1.
+        if (codeSub === 'dlc') {
+          var dlcRes = await fetch(THUMB_WORKER + '/dlc-url?title=' + encodeURIComponent(cName));
+          var dlcData = await dlcRes.json();
+          if (!dlcRes.ok) throw new Error(dlcData.error || 'Could not resolve DLC URL');
+          cStoreUrl = dlcData.url;
+        } else {
+          var cSlug = cName.normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[™®©]/g, '')
+            .replace(/\s*[–—]\s*/g, '-').replace(/:/g, '')
+            .replace(/!/g, '').replace(/&/g, 'and').replace(/\+/g, 'plus')
+            .replace(/\.(\d)/g, '-$1').replace(/\./g, '')
+            .toLowerCase().trim().replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+          cStoreUrl = 'www.nintendo.com/us/store/products/' + cSlug + '-switch-2/';
+        }
       }
 
       btn.textContent = 'Fetching cover…';
@@ -1392,8 +1490,8 @@ el('thumbBtn').addEventListener('click', async function() {
         body: JSON.stringify({ storeUrl: cStoreUrl, gameTitle: cName })
       });
       var cData = await cRes.json();
-      // For non-DLC, fall back to NS1 URL if NS2 not found
-      if (!cRes.ok && codeSub !== 'dlc' && platSel !== 'ns2') {
+      // For NS non-DLC, fall back to NS1 URL if NS2 not found
+      if (!cRes.ok && !cIsPS && codeSub !== 'dlc' && platSel !== 'ns2') {
         var cSlugFb = cStoreUrl.replace('-switch-2/', '-switch/');
         cRes = await fetch(THUMB_WORKER, {
           method: 'POST',
@@ -1410,8 +1508,14 @@ el('thumbBtn').addEventListener('click', async function() {
       curImageUrls = { coverUrl: cEffectiveCoverUrl, screenshotUrls: [] };
 
       // Fetch code frame + cover art as blobs (blob URLs don't taint canvas)
+      // For PS, try PS frame first; fall back to ns12 if server doesn't have one yet
       var cPlatArg = platSel || 'ns12';
-      var cFrameBlob  = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cPlatArg).then(function(r) { if (!r.ok) throw new Error('Frame not found'); return r.blob(); });
+      var cFrameResp = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cPlatArg);
+      if (!cFrameResp.ok && cIsPS) {
+        cFrameResp = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=ns12');
+      }
+      if (!cFrameResp.ok) throw new Error('Frame not found');
+      var cFrameBlob = await cFrameResp.blob();
       var cCoverBlob  = await fetch(THUMB_WORKER + '/download?url=' + encodeURIComponent(cEffectiveCoverUrl)).then(function(r) { if (!r.ok) throw new Error('Cover fetch failed'); return r.blob(); });
 
       var cFrameBlobUrl = URL.createObjectURL(cFrameBlob);
@@ -1425,11 +1529,17 @@ el('thumbBtn').addEventListener('click', async function() {
       el('thumbPreview').src = curCodeThumbDataUrl;
       el('thumbTitleGroup').style.display = 'none';
 
-      var cPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
-      el('thumbLinks').textContent =
-        'Thumbnail (File 1): [generated — use downloaded file]' +
-        '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?key=eshop' +
-        '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/code-promo-slide?key=' + cPlatKey;
+      if (cIsPS) {
+        el('thumbLinks').textContent =
+          'Thumbnail (File 1): [generated — use downloaded file]' +
+          '\n\nPromo (File 2):\n' + THUMB_WORKER + '/ps-promo-slide';
+      } else {
+        var cPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
+        el('thumbLinks').textContent =
+          'Thumbnail (File 1): [generated — use downloaded file]' +
+          '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?key=eshop' +
+          '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/code-promo-slide?key=' + cPlatKey;
+      }
 
       el('thumbCard').style.display = 'block';
       btn.disabled = false;
@@ -1570,10 +1680,16 @@ async function buildAllBlobs() {
   if (needCoverFetch) fetchItems.push({ key: 'cover',  url: THUMB_WORKER + '/download?url=' + encodeURIComponent(curImageUrls.coverUrl) });
   if (!frameDataUrl && !isCodeMode) fetchItems.push({ key: 'frame',  url: THUMB_WORKER + '/frame' });
   if (isCodeMode) {
-    // File 2: eshop how-to-redeem; File 3: platform logos
-    var bPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
-    fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/code-promo-slide?key=eshop' });
-    fetchItems.push({ key: 'plat',  url: THUMB_WORKER + '/code-promo-slide?key=' + bPlatKey });
+    var bIsPS = platSel === 'ps45' || platSel === 'ps5';
+    if (bIsPS) {
+      // PS code: use PS promo slide (no separate platform slide)
+      fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/ps-promo-slide' });
+    } else {
+      // NS code: eShop how-to-redeem + platform logos
+      var bPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
+      fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/code-promo-slide?key=eshop' });
+      fetchItems.push({ key: 'plat',  url: THUMB_WORKER + '/code-promo-slide?key=' + bPlatKey });
+    }
   } else {
     var promoSlideEndpoint = (platSel === 'ps45' || platSel === 'ps5') ? '/ps-promo-slide' : '/promo-slide';
     fetchItems.push({ key: 'promo', url: THUMB_WORKER + promoSlideEndpoint });
@@ -1608,8 +1724,14 @@ async function buildAllBlobs() {
   var thumbBlob;
   if (isCodeMode) {
     // Code mode: re-render cover + code frame composite (no title)
-    var cbPlatArg = platSel || 'ns12';
-    var cbFrameBlob = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cbPlatArg).then(function(r) { return r.blob(); });
+    // For PS, try PS frame first; fall back to ns12 if not available
+    var cbIsPS = platSel === 'ps45' || platSel === 'ps5';
+    var cbPlatArg = cbIsPS ? platSel : (platSel || 'ns12');
+    var cbFrameResp = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cbPlatArg);
+    if (!cbFrameResp.ok && cbIsPS) {
+      cbFrameResp = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=ns12');
+    }
+    var cbFrameBlob = await cbFrameResp.blob();
     var cbFrameBlobUrl = URL.createObjectURL(cbFrameBlob);
     // Cover: use stored blob URL from thumbnail generation, or re-fetch
     var cbCoverUrl = curCoverDataUrl;

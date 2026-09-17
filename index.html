@@ -1499,14 +1499,8 @@ el('thumbBtn').addEventListener('click', async function() {
       curImageUrls = { coverUrl: cEffectiveCoverUrl, screenshotUrls: [] };
 
       // Fetch code frame + cover art as blobs (blob URLs don't taint canvas)
-      // For PS, try PS frame first; fall back to ns12 if server doesn't have one yet
       var cPlatArg = platSel || 'ns12';
-      var cFrameResp = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cPlatArg);
-      if (!cFrameResp.ok && cIsPS) {
-        cFrameResp = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=ns12');
-      }
-      if (!cFrameResp.ok) throw new Error('Frame not found');
-      var cFrameBlob = await cFrameResp.blob();
+      var cFrameBlob = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cPlatArg).then(function(r) { if (!r.ok) throw new Error('Frame not found'); return r.blob(); });
       var cCoverBlob  = await fetch(THUMB_WORKER + '/download?url=' + encodeURIComponent(cEffectiveCoverUrl)).then(function(r) { if (!r.ok) throw new Error('Cover fetch failed'); return r.blob(); });
 
       var cFrameBlobUrl = URL.createObjectURL(cFrameBlob);
@@ -1715,14 +1709,8 @@ async function buildAllBlobs() {
   var thumbBlob;
   if (isCodeMode) {
     // Code mode: re-render cover + code frame composite (no title)
-    // For PS, try PS frame first; fall back to ns12 if not available
-    var cbIsPS = platSel === 'ps45' || platSel === 'ps5';
-    var cbPlatArg = cbIsPS ? platSel : (platSel || 'ns12');
-    var cbFrameResp = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cbPlatArg);
-    if (!cbFrameResp.ok && cbIsPS) {
-      cbFrameResp = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=ns12');
-    }
-    var cbFrameBlob = await cbFrameResp.blob();
+    var cbPlatArg = platSel || 'ns12';
+    var cbFrameBlob = await fetch(THUMB_WORKER + '/code-frame?sub=' + codeSub + '&plat=' + cbPlatArg).then(function(r) { return r.blob(); });
     var cbFrameBlobUrl = URL.createObjectURL(cbFrameBlob);
     // Cover: use stored blob URL from thumbnail generation, or re-fetch
     var cbCoverUrl = curCoverDataUrl;

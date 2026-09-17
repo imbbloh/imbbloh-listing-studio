@@ -52,11 +52,17 @@ const CODE_FRAME_PNG = {};
 const CODE_FRAME_B64 = {};
 const CODE_PROMO_PNG = {};
 
-// Full Game: one frame covers both NS1&2 and NS2
+// Full Game: NS frame (covers NS1&2 and NS2)
 try {
   CODE_FRAME_PNG['full'] = fs.readFileSync(path.join(__dirname, 'assets/code-full-frame.png'));
   CODE_FRAME_B64['full'] = CODE_FRAME_PNG['full'].toString('base64');
 } catch (e) { console.warn('assets/code-full-frame.png not found'); }
+
+// Full Game: PS frame (covers PS4&5 and PS5)
+try {
+  CODE_FRAME_PNG['full-ps'] = fs.readFileSync(path.join(__dirname, 'assets/code-full-frame-ps.png'));
+  CODE_FRAME_B64['full-ps'] = CODE_FRAME_PNG['full-ps'].toString('base64');
+} catch (e) { console.warn('assets/code-full-frame-ps.png not found'); }
 
 // DLC: platform-specific frames (NS1&2 shows NS logo, NS2 shows NS2 logo)
 ['ns12', 'ns2'].forEach(plat => {
@@ -314,8 +320,11 @@ app.get('/code-frame', (req, res) => {
   const codeSub = (req.query.sub  || 'full').toLowerCase();
   const platSel = (req.query.plat || 'ns12').toLowerCase();
 
+  const isPS = platSel === 'ps45' || platSel === 'ps5';
   let frameKey;
-  if (codeSub === 'dlc') {
+  if (isPS) {
+    frameKey = 'full-ps'; // PS uses same frame for all code subtypes
+  } else if (codeSub === 'dlc') {
     frameKey = platSel === 'ns2' ? 'dlc-ns2' : 'dlc-ns12';
   } else {
     frameKey = codeSub; // 'full' or 'upgrade'

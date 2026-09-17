@@ -595,19 +595,8 @@ function el(id) { return document.getElementById(id); }
 
 // ── Store URL visibility helper ────────────────────────────────────────────
 function updateCodeStoreUrlViz() {
-  var isPS = platSel === 'ps45' || platSel === 'ps5';
-  // Visible in game mode; visible in code mode only when PS platform is selected
-  el('secStoreUrl').style.display = (appMode !== 'code' || isPS) ? 'block' : 'none';
-  if (appMode === 'code') {
-    var lbl = el('secStoreUrl').querySelector('label');
-    if (lbl) {
-      if (isPS) {
-        lbl.innerHTML = 'PlayStation Store URL <span style="color:var(--muted);font-size:0.65rem;font-weight:600">● for thumbnail</span>';
-      } else {
-        lbl.innerHTML = 'Official Store URL <span style="color:var(--green);font-size:0.65rem;font-weight:600">● Auto-generated</span>';
-      }
-    }
-  }
+  // Store URL hidden in code mode (auto-resolved for both NS and PS)
+  el('secStoreUrl').style.display = appMode !== 'code' ? 'block' : 'none';
 }
 
 // ── Mode switch ────────────────────────────────────────────────────────────
@@ -708,8 +697,6 @@ function setPlat(p) {
     el('sub-upgrade').classList.toggle('dimmed', isPS);
     el('sub-upgrade').style.opacity       = isPS ? '0.3' : '';
     el('sub-upgrade').style.pointerEvents = isPS ? 'none' : '';
-    // Show/hide store URL field
-    updateCodeStoreUrlViz();
   }
 }
 
@@ -1459,9 +1446,15 @@ el('thumbBtn').addEventListener('click', async function() {
       var cStoreUrl;
 
       if (cIsPS) {
-        // PS code mode: user provides store URL directly
-        cStoreUrl = el('storeUrl').value.trim();
-        if (!cStoreUrl) throw new Error('Enter a PlayStation Store URL to generate the thumbnail');
+        // PS code mode: auto-build PlayStation Store URL from game title slug
+        var psSlug = cName.normalize('NFD').replace(/[̀-ͯ]/g, '')
+          .replace(/[™®©]/g, '')
+          .replace(/\s*[–—]\s*/g, '-').replace(/:/g, '')
+          .replace(/!/g, '').replace(/&/g, 'and').replace(/\+/g, 'plus')
+          .replace(/\.(\d)/g, '-$1').replace(/\./g, '')
+          .toLowerCase().trim().replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+        cStoreUrl = 'www.playstation.com/en-us/games/' + psSlug + '/';
       } else {
         // NS code mode: auto-resolve Nintendo store URL
         // DLC: product ID is in the URL — must scrape the base game page.

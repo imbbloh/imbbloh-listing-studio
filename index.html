@@ -456,7 +456,6 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
         <div class="sub-pill" id="sub-dlc">🔹 DLC</div>
         <div class="sub-pill" id="sub-upgrade">⬆️ Upgrade Pack</div>
       </div>
-      <div class="ns-only-note" id="nsOnlyNote">● Upgrade Pack: Nintendo Switch 2 only</div>
     </div>
 
     <!-- Game: Dual price -->
@@ -613,7 +612,6 @@ function setMode(m) {
   el('secSubtype').style.display   = isCode ? 'block' : 'none';
   el('secGamePrice').style.display = isCode ? 'none'  : 'block';
   el('secCodePrice').style.display = isCode ? 'block' : 'none';
-  el('nsOnlyNote').style.display   = isCode ? 'block' : 'none';
 
   // Reset subtype to full when switching to game mode
   if (!isCode) {

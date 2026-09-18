@@ -208,15 +208,17 @@ function extractPsAssets(html) {
   if (apJpgThumb) coverUrl = apJpgThumb;
 
   // Square cover (packshot): .png files from vulcan/ap/rnd/ are square box art;
-  // .jpg files are portrait heroes. Try thumb URLs first, then all page URLs.
-  const pngThumb = thumbUrls.find(u => u.includes('/vulcan/ap/rnd/') && u.endsWith('.png'));
-  if (pngThumb) {
-    squareCoverUrl = pngThumb;
+  // .jpg files are portrait heroes. PS Store lists Deluxe editions first and
+  // Standard last, so use the LAST .png thumb to get the standard edition art.
+  const pngThumbs = thumbUrls.filter(u => u.includes('/vulcan/ap/rnd/') && u.endsWith('.png'));
+  if (pngThumbs.length > 0) {
+    squareCoverUrl = pngThumbs[pngThumbs.length - 1];
   } else {
-    // Fallback: first .png from vulcan/ap/rnd/ anywhere in the page
+    // Fallback: last .png from vulcan/ap/rnd/ anywhere in the page
     const apPngRe = /https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>?\\]+\.png/gi;
-    const apPngMatch = apPngRe.exec(html);
-    if (apPngMatch) squareCoverUrl = apPngMatch[0];
+    let apPngMatch, lastApPng = null;
+    while ((apPngMatch = apPngRe.exec(html)) !== null) lastApPng = apPngMatch[0];
+    if (lastApPng) squareCoverUrl = lastApPng;
   }
 
   // og:image fallback for coverUrl
@@ -457,10 +459,16 @@ app.get('/debug-ps', async (req, res) => {
       if (!seenT2.has(base)) { seenT2.add(base); thumbUrlsDebug.push({ base, full: tm2[0] }); }
     }
     // Simulate extractPsAssets picks
-    const apJpg  = thumbUrlsDebug.find(t => t.base.includes('/vulcan/ap/rnd/') && t.base.endsWith('.jpg'));
-    const apPng  = thumbUrlsDebug.find(t => t.base.includes('/vulcan/ap/rnd/') && t.base.endsWith('.png'));
-    const apPngFallback = apPng ? null : (html.match(/https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>?\\]+\.png/i) || [])[0] || null;
-    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed, thumbUrlsDebug, simulatedPicks: { coverUrl: apJpg?.base || null, squareCoverUrl: apPng?.base || apPngFallback || null } });
+    const apJpg   = thumbUrlsDebug.find(t => t.base.includes('/vulcan/ap/rnd/') && t.base.endsWith('.jpg'));
+    const apPngs  = thumbUrlsDebug.filter(t => t.base.includes('/vulcan/ap/rnd/') && t.base.endsWith('.png'));
+    const lastPng = apPngs.length > 0 ? apPngs[apPngs.length - 1] : null;
+    let apPngFallback = null;
+    if (!lastPng) {
+      const fbRe = /https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>?\\]+\.png/gi;
+      let fm, last = null; while ((fm = fbRe.exec(html)) !== null) last = fm[0];
+      apPngFallback = last;
+    }
+    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed, thumbUrlsDebug, simulatedPicks: { coverUrl: apJpg?.base || null, squareCoverUrl: lastPng?.base || apPngFallback || null, allPngThumbs: apPngs.map(t => t.base) } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

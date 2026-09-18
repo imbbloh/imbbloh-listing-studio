@@ -189,21 +189,49 @@ function extractNintendoAssets(html) {
 }
 
 function extractPsAssets(html) {
-  // The portrait cover image appears in the page as a .jpg with a ?w=54&thumb=true
-  // thumbnail variant immediately following it (in the edition selector section).
-  // Matching the thumb variant and capturing the base URL is the most reliable signal.
+  // Try __NEXT_DATA__ first — has typed media roles including the square packshot
+  let squareCoverUrl = null;
   let coverUrl = null;
-  const thumbRef = html.match(
-    /(https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'<>\s?]+\.jpg)\?[^"'<>\s]*thumb/i
-  );
-  if (thumbRef) coverUrl = thumbRef[1];
 
-  // Fall back to og:image
+  const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (nextMatch) {
+    try {
+      const data = JSON.parse(nextMatch[1]);
+      const product = data?.props?.pageProps?.data?.product
+                   || data?.props?.pageProps?.product;
+      const media = product?.media || [];
+      // Prefer MASTER (square packshot), fall back to EDITION_PACKAGE_ART
+      const squareRoles = ['MASTER', 'EDITION_PACKAGE_ART'];
+      for (const role of squareRoles) {
+        const item = media.find(m => m.role === role && m.url);
+        if (item) { squareCoverUrl = item.url; break; }
+      }
+      // Portrait cover from GAMEHUB_COVER_ART or BACKGROUND_IMAGE as coverUrl
+      const portraitRoles = ['GAMEHUB_COVER_ART', 'BACKGROUND_IMAGE'];
+      for (const role of portraitRoles) {
+        const item = media.find(m => m.role === role && m.url);
+        if (item) { coverUrl = item.url; break; }
+      }
+    } catch (e) { /* fall through to regex */ }
+  }
+
+  // Regex fallback for coverUrl: .jpg with ?thumb variant in edition selector
+  if (!coverUrl) {
+    const thumbRef = html.match(
+      /(https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'<>\s?]+\.jpg)\?[^"'<>\s]*thumb/i
+    );
+    if (thumbRef) coverUrl = thumbRef[1];
+  }
+
+  // og:image fallback
   if (!coverUrl) {
     const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
                   || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
     coverUrl = ogMatch ? ogMatch[1] : null;
   }
+
+  // If still no coverUrl, use squareCoverUrl as coverUrl
+  if (!coverUrl && squareCoverUrl) coverUrl = squareCoverUrl;
 
   if (!coverUrl) throw new Error('Could not extract cover image from PlayStation store page');
 
@@ -219,7 +247,7 @@ function extractPsAssets(html) {
     if (screenshots.length >= 7) break;
   }
   // Index 0 = cover art (mirrors NS structure the frontend expects)
-  return { coverUrl, screenshotUrls: [coverUrl, ...screenshots] };
+  return { coverUrl, squareCoverUrl, screenshotUrls: [coverUrl, ...screenshots] };
 }
 
 function buildPsThumbnailSvg(gameTitle, coverBase64, frameBase64, fontBase64) {
@@ -584,14 +612,14 @@ app.post('/', async (req, res) => {
 
     if (isPS) {
       if (!PS_FRAME_BASE64) throw new Error('PS frame asset not found — commit assets/ps-template-frame.png to the repo');
-      const { coverUrl, screenshotUrls } = extractPsAssets(html);
-      console.log('[PS] coverUrl:', coverUrl);
+      const { coverUrl, squareCoverUrl, screenshotUrls } = extractPsAssets(html);
+      console.log('[PS] coverUrl:', coverUrl, '| squareCoverUrl:', squareCoverUrl);
       const imgRes = await fetch(coverUrl);
       if (!imgRes.ok) throw new Error('Cover image fetch failed: ' + imgRes.status);
       const coverBase64 = toBase64(await imgRes.arrayBuffer());
       const svg = buildPsThumbnailSvg(gameTitle, coverBase64, PS_FRAME_BASE64, FONT_BASE64);
       const thumbnailDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf-8').toString('base64');
-      return res.json({ thumbnailDataUrl, coverUrl, screenshotUrls });
+      return res.json({ thumbnailDataUrl, coverUrl, squareCoverUrl, screenshotUrls });
     }
 
     const { platform, nsuid, hashes, squareHash, atumCoverUrl } = extractNintendoAssets(html);

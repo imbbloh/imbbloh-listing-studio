@@ -192,8 +192,15 @@ function extractPsAssets(html) {
   let coverUrl = null;
   let squareCoverUrl = null;
 
-  // Collect all edition-selector thumbnail URLs (appear as ?w=54&thumb=true or similar)
-  // These are the square packshot images shown in the PS Store edition picker
+  // og:image — PS Store sets this to the standard edition square packshot when .png
+  const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+                || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+  const ogImage = ogMatch ? ogMatch[1] : null;
+  if (ogImage && /\/vulcan\/ap\/rnd\/.+\.png/i.test(ogImage)) {
+    squareCoverUrl = ogImage;
+  }
+
+  // Collect edition-selector thumbnail URLs (?thumb)
   const thumbRe = /(https:\/\/image\.api\.playstation\.com\/vulcan\/[^"'<>\s?]+)\?[^"'<>\s]*thumb[^"'<>\s]*/gi;
   const seenT = new Set();
   const thumbUrls = [];
@@ -207,26 +214,21 @@ function extractPsAssets(html) {
   const apJpgThumb = thumbUrls.find(u => u.includes('/vulcan/ap/rnd/') && u.endsWith('.jpg'));
   if (apJpgThumb) coverUrl = apJpgThumb;
 
-  // Square cover (packshot): .png files from vulcan/ap/rnd/ are square box art;
-  // .jpg files are portrait heroes. PS Store lists Deluxe editions first and
-  // Standard last, so use the LAST .png thumb to get the standard edition art.
-  const pngThumbs = thumbUrls.filter(u => u.includes('/vulcan/ap/rnd/') && u.endsWith('.png'));
-  if (pngThumbs.length > 0) {
-    squareCoverUrl = pngThumbs[pngThumbs.length - 1];
-  } else {
-    // Fallback: last .png from vulcan/ap/rnd/ anywhere in the page
-    const apPngRe = /https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>?\\]+\.png/gi;
-    let apPngMatch, lastApPng = null;
-    while ((apPngMatch = apPngRe.exec(html)) !== null) lastApPng = apPngMatch[0];
-    if (lastApPng) squareCoverUrl = lastApPng;
+  // Square cover fallback (when og:image wasn't a .png): last .png thumb
+  if (!squareCoverUrl) {
+    const pngThumbs = thumbUrls.filter(u => u.includes('/vulcan/ap/rnd/') && u.endsWith('.png'));
+    if (pngThumbs.length > 0) {
+      squareCoverUrl = pngThumbs[pngThumbs.length - 1];
+    } else {
+      const apPngRe = /https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>?\\]+\.png/gi;
+      let apPngMatch, lastApPng = null;
+      while ((apPngMatch = apPngRe.exec(html)) !== null) lastApPng = apPngMatch[0];
+      if (lastApPng) squareCoverUrl = lastApPng;
+    }
   }
 
-  // og:image fallback for coverUrl
-  if (!coverUrl) {
-    const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
-                  || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
-    coverUrl = ogMatch ? ogMatch[1] : null;
-  }
+  // coverUrl fallback: og:image (even if .jpg)
+  if (!coverUrl && ogImage) coverUrl = ogImage;
 
   // Last resort: use squareCoverUrl as coverUrl
   if (!coverUrl && squareCoverUrl) coverUrl = squareCoverUrl;
@@ -467,10 +469,13 @@ app.get('/debug-ps', async (req, res) => {
     const apJpgRe = /(https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'<>\s?\\]+\.jpg)\?[^"'<>\s]*thumb/gi;
     const apJpgM = apJpgRe.exec(html);
     const apJpg = apJpgM ? apJpgM[1] : null;
-    const apPngThumbs = thumbUrlsDebug;
-    const lastPng = apPngThumbs.length > 0 ? apPngThumbs[apPngThumbs.length - 1] : null;
+    // squareCoverUrl: og:image if .png, else last .png thumb, else last ap/rnd .png
+    const ogIsPng = ogImage && /\/vulcan\/ap\/rnd\/.+\.png/i.test(ogImage);
+    const pngThumbs2 = thumbUrlsDebug.filter(t => t.base.endsWith('.png'));
+    const lastPng = pngThumbs2.length > 0 ? pngThumbs2[pngThumbs2.length - 1] : null;
     const apPngFallback = !lastPng && allApPngs.length > 0 ? allApPngs[allApPngs.length - 1] : null;
-    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed, allApPngs, thumbUrlsDebug, simulatedPicks: { coverUrl: apJpg || null, squareCoverUrl: lastPng?.base || apPngFallback?.base || null, allPngThumbs: apPngThumbs.map(t => t.base) } });
+    const simSquare = ogIsPng ? ogImage : (lastPng?.base || apPngFallback?.base || null);
+    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed, allApPngs, thumbUrlsDebug, simulatedPicks: { coverUrl: apJpg || ogImage || null, squareCoverUrl: simSquare, allPngThumbs: pngThumbs2.map(t => t.base), ogIsPng } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

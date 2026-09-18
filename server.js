@@ -189,61 +189,51 @@ function extractNintendoAssets(html) {
 }
 
 function extractPsAssets(html) {
-  // Try __NEXT_DATA__ first — has typed media roles including the square packshot
-  let squareCoverUrl = null;
   let coverUrl = null;
+  let squareCoverUrl = null;
 
-  const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-  if (nextMatch) {
-    try {
-      const data = JSON.parse(nextMatch[1]);
-      const product = data?.props?.pageProps?.data?.product
-                   || data?.props?.pageProps?.product;
-      const media = product?.media || [];
-      // Prefer MASTER (square packshot), fall back to EDITION_PACKAGE_ART
-      const squareRoles = ['MASTER', 'EDITION_PACKAGE_ART'];
-      for (const role of squareRoles) {
-        const item = media.find(m => m.role === role && m.url);
-        if (item) { squareCoverUrl = item.url; break; }
-      }
-      // Portrait cover from GAMEHUB_COVER_ART or BACKGROUND_IMAGE as coverUrl
-      const portraitRoles = ['GAMEHUB_COVER_ART', 'BACKGROUND_IMAGE'];
-      for (const role of portraitRoles) {
-        const item = media.find(m => m.role === role && m.url);
-        if (item) { coverUrl = item.url; break; }
-      }
-    } catch (e) { /* fall through to regex */ }
+  // Collect all gmedia URLs (preserving order)
+  const seenG = new Set();
+  const gmediaUrls = [];
+  const gmRe = /https:\/\/gmedia\.playstation\.com\/[^"'\s<>\\]+/gi;
+  let gm;
+  while ((gm = gmRe.exec(html)) !== null) {
+    const u = gm[0].split('?')[0].split('"')[0].split('&#')[0];
+    if (!seenG.has(u)) { seenG.add(u); gmediaUrls.push(u); }
   }
 
-  // Regex fallback for coverUrl: .jpg with ?thumb variant in edition selector
-  if (!coverUrl) {
-    const thumbRef = html.match(
-      /(https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'<>\s?]+\.jpg)\?[^"'<>\s]*thumb/i
-    );
-    if (thumbRef) coverUrl = thumbRef[1];
-  }
+  // Square cover art: jewelbox images (physical box cover) — prefer PS5, then PS4, then any
+  const jewelboxUrls = gmediaUrls.filter(u => u.includes('jewelbox'));
+  const ps5Jewel = jewelboxUrls.find(u => u.includes('ps5'));
+  const ps4Jewel = jewelboxUrls.find(u => u.includes('ps4'));
+  const anyJewel = jewelboxUrls[0];
+  const jewelUrl = ps5Jewel || ps4Jewel || anyJewel || null;
+  if (jewelUrl) squareCoverUrl = jewelUrl + '?$1600px$';
 
-  // og:image fallback
+  // Portrait cover: .jpg with ?thumb variant in the edition selector
+  const thumbRef = html.match(
+    /(https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'<>\s?]+\.jpg)\?[^"'<>\s]*thumb/i
+  );
+  if (thumbRef) coverUrl = thumbRef[1];
+
+  // og:image fallback for coverUrl
   if (!coverUrl) {
     const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
                   || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
     coverUrl = ogMatch ? ogMatch[1] : null;
   }
 
-  // If still no coverUrl, use squareCoverUrl as coverUrl
+  // Last resort: use squareCoverUrl as coverUrl
   if (!coverUrl && squareCoverUrl) coverUrl = squareCoverUrl;
 
   if (!coverUrl) throw new Error('Could not extract cover image from PlayStation store page');
 
-  // Collect gameplay screenshots: gmedia.playstation.com URLs containing "-screenshot-".
+  // Gameplay screenshots: gmedia URLs containing "-screenshot-"
   const seen = new Set();
   const screenshots = [];
-  const re = /https:\/\/gmedia\.playstation\.com\/[^"'\s<>\\]+/gi;
-  let m;
-  while ((m = re.exec(html)) !== null) {
-    const baseUrl = m[0].split('?')[0].split('"')[0];
-    if (!baseUrl.includes('-screenshot-')) continue;
-    if (!seen.has(baseUrl)) { seen.add(baseUrl); screenshots.push(baseUrl + '?$1600px$'); }
+  for (const u of gmediaUrls) {
+    if (!u.includes('-screenshot-')) continue;
+    if (!seen.has(u)) { seen.add(u); screenshots.push(u + '?$1600px$'); }
     if (screenshots.length >= 7) break;
   }
   // Index 0 = cover art (mirrors NS structure the frontend expects)

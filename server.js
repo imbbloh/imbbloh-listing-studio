@@ -192,29 +192,30 @@ function extractPsAssets(html) {
   let coverUrl = null;
   let squareCoverUrl = null;
 
-  // Collect all gmedia URLs (preserving order)
-  const seenG = new Set();
-  const gmediaUrls = [];
-  const gmRe = /https:\/\/gmedia\.playstation\.com\/[^"'\s<>\\]+/gi;
-  let gm;
-  while ((gm = gmRe.exec(html)) !== null) {
-    const u = gm[0].split('?')[0].split('"')[0].split('&#')[0];
-    if (!seenG.has(u)) { seenG.add(u); gmediaUrls.push(u); }
+  // Collect all edition-selector thumbnail URLs (appear as ?w=54&thumb=true or similar)
+  // These are the square packshot images shown in the PS Store edition picker
+  const thumbRe = /(https:\/\/image\.api\.playstation\.com\/vulcan\/[^"'<>\s?]+)\?[^"'<>\s]*thumb[^"'<>\s]*/gi;
+  const seenT = new Set();
+  const thumbUrls = [];
+  let tm;
+  while ((tm = thumbRe.exec(html)) !== null) {
+    const base = tm[1];
+    if (!seenT.has(base)) { seenT.add(base); thumbUrls.push(base); }
   }
 
-  // Square cover art: jewelbox images (physical box cover) — prefer PS5, then PS4, then any
-  const jewelboxUrls = gmediaUrls.filter(u => u.includes('jewelbox'));
-  const ps5Jewel = jewelboxUrls.find(u => u.includes('ps5'));
-  const ps4Jewel = jewelboxUrls.find(u => u.includes('ps4'));
-  const anyJewel = jewelboxUrls[0];
-  const jewelUrl = ps5Jewel || ps4Jewel || anyJewel || null;
-  if (jewelUrl) squareCoverUrl = jewelUrl + '?$1600px$';
+  // Portrait cover: first ap/rnd .jpg thumb (main hero image)
+  const apJpgThumb = thumbUrls.find(u => u.includes('/vulcan/ap/rnd/') && u.endsWith('.jpg'));
+  if (apJpgThumb) coverUrl = apJpgThumb;
 
-  // Portrait cover: .jpg with ?thumb variant in the edition selector
-  const thumbRef = html.match(
-    /(https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'<>\s?]+\.jpg)\?[^"'<>\s]*thumb/i
-  );
-  if (thumbRef) coverUrl = thumbRef[1];
+  // Square cover (packshot): prefer img/rnd bucket (distinct from the portrait hero bucket)
+  // Fallback: first thumb that differs from the portrait coverUrl
+  const imgThumb = thumbUrls.find(u => u.includes('/vulcan/img/rnd/'));
+  if (imgThumb) {
+    squareCoverUrl = imgThumb;
+  } else {
+    const altThumb = thumbUrls.find(u => u !== coverUrl);
+    if (altThumb) squareCoverUrl = altThumb;
+  }
 
   // og:image fallback for coverUrl
   if (!coverUrl) {
@@ -229,6 +230,15 @@ function extractPsAssets(html) {
   if (!coverUrl) throw new Error('Could not extract cover image from PlayStation store page');
 
   // Gameplay screenshots: gmedia URLs containing "-screenshot-"
+  const seenG = new Set();
+  const gmediaUrls = [];
+  const gmRe = /https:\/\/gmedia\.playstation\.com\/[^"'\s<>\\]+/gi;
+  let gm;
+  while ((gm = gmRe.exec(html)) !== null) {
+    const u = gm[0].split('?')[0].split('"')[0].split('&#')[0];
+    if (!seenG.has(u)) { seenG.add(u); gmediaUrls.push(u); }
+  }
+
   const seen = new Set();
   const screenshots = [];
   for (const u of gmediaUrls) {
@@ -435,7 +445,19 @@ app.get('/debug-ps', async (req, res) => {
       .slice(0, 7)
       .map(u => u + '?$1600px$');
 
-    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed });
+    // Edition-selector thumb URLs (square packshot candidates)
+    const thumbRe2 = /(https:\/\/image\.api\.playstation\.com\/vulcan\/[^"'<>\s?]+)\?[^"'<>\s]*thumb[^"'<>\s]*/gi;
+    const seenT2 = new Set();
+    const thumbUrlsDebug = [];
+    let tm2;
+    while ((tm2 = thumbRe2.exec(html)) !== null) {
+      const base = tm2[1];
+      if (!seenT2.has(base)) { seenT2.add(base); thumbUrlsDebug.push({ base, full: tm2[0] }); }
+    }
+    // Simulate extractPsAssets picks
+    const apJpg = thumbUrlsDebug.find(t => t.base.includes('/vulcan/ap/rnd/') && t.base.endsWith('.jpg'));
+    const imgPick = thumbUrlsDebug.find(t => t.base.includes('/vulcan/img/rnd/'));
+    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed, thumbUrlsDebug, simulatedPicks: { coverUrl: apJpg?.base || null, squareCoverUrl: imgPick?.base || null } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -207,14 +207,16 @@ function extractPsAssets(html) {
   const apJpgThumb = thumbUrls.find(u => u.includes('/vulcan/ap/rnd/') && u.endsWith('.jpg'));
   if (apJpgThumb) coverUrl = apJpgThumb;
 
-  // Square cover (packshot): prefer img/rnd bucket (distinct from the portrait hero bucket)
-  // Fallback: first thumb that differs from the portrait coverUrl
-  const imgThumb = thumbUrls.find(u => u.includes('/vulcan/img/rnd/'));
-  if (imgThumb) {
-    squareCoverUrl = imgThumb;
+  // Square cover (packshot): .png files from vulcan/ap/rnd/ are square box art;
+  // .jpg files are portrait heroes. Try thumb URLs first, then all page URLs.
+  const pngThumb = thumbUrls.find(u => u.includes('/vulcan/ap/rnd/') && u.endsWith('.png'));
+  if (pngThumb) {
+    squareCoverUrl = pngThumb;
   } else {
-    const altThumb = thumbUrls.find(u => u !== coverUrl);
-    if (altThumb) squareCoverUrl = altThumb;
+    // Fallback: first .png from vulcan/ap/rnd/ anywhere in the page
+    const apPngRe = /https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>?\\]+\.png/gi;
+    const apPngMatch = apPngRe.exec(html);
+    if (apPngMatch) squareCoverUrl = apPngMatch[0];
   }
 
   // og:image fallback for coverUrl
@@ -455,9 +457,10 @@ app.get('/debug-ps', async (req, res) => {
       if (!seenT2.has(base)) { seenT2.add(base); thumbUrlsDebug.push({ base, full: tm2[0] }); }
     }
     // Simulate extractPsAssets picks
-    const apJpg = thumbUrlsDebug.find(t => t.base.includes('/vulcan/ap/rnd/') && t.base.endsWith('.jpg'));
-    const imgPick = thumbUrlsDebug.find(t => t.base.includes('/vulcan/img/rnd/'));
-    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed, thumbUrlsDebug, simulatedPicks: { coverUrl: apJpg?.base || null, squareCoverUrl: imgPick?.base || null } });
+    const apJpg  = thumbUrlsDebug.find(t => t.base.includes('/vulcan/ap/rnd/') && t.base.endsWith('.jpg'));
+    const apPng  = thumbUrlsDebug.find(t => t.base.includes('/vulcan/ap/rnd/') && t.base.endsWith('.png'));
+    const apPngFallback = apPng ? null : (html.match(/https:\/\/image\.api\.playstation\.com\/vulcan\/ap\/rnd\/[^"'\s<>?\\]+\.png/i) || [])[0] || null;
+    res.json({ ogImage, nextDataMedia, allUrls, gmediaUrls, screenshotsUsed, thumbUrlsDebug, simulatedPicks: { coverUrl: apJpg?.base || null, squareCoverUrl: apPng?.base || apPngFallback || null } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

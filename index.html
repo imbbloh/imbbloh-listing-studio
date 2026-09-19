@@ -1520,9 +1520,12 @@ el('thumbBtn').addEventListener('click', async function() {
       el('thumbTitleGroup').style.display = 'none';
 
       if (cIsPS) {
-        el('thumbLinks').textContent =
-          'Thumbnail (File 1): [generated — use downloaded file]' +
+        var cPsPlatLinks = 'Thumbnail (File 1): [generated — use downloaded file]' +
           '\n\nPromo (File 2):\n' + THUMB_WORKER + '/ps-promo-slide';
+        if (platSel === 'ps5') {
+          cPsPlatLinks += '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/ps-plat-slide?key=ps5';
+        }
+        el('thumbLinks').textContent = cPsPlatLinks;
       } else {
         var cPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';
         el('thumbLinks').textContent =
@@ -1672,8 +1675,10 @@ async function buildAllBlobs() {
   if (isCodeMode) {
     var bIsPS = platSel === 'ps45' || platSel === 'ps5';
     if (bIsPS) {
-      // PS code: use PS promo slide (no separate platform slide)
       fetchItems.push({ key: 'promo', url: THUMB_WORKER + '/ps-promo-slide' });
+      if (platSel === 'ps5') {
+        fetchItems.push({ key: 'plat', url: THUMB_WORKER + '/ps-plat-slide?key=ps5' });
+      }
     } else {
       // NS code: eShop how-to-redeem + platform logos
       var bPlatKey = platSel === 'ns12' ? 'ns12' : 'ns2';

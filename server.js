@@ -53,6 +53,11 @@ try {
   PS_PLAT_PS5_PNG = fs.readFileSync(path.join(__dirname, 'assets/code-promo-ps5.png'));
 } catch (e) { console.warn('assets/code-promo-ps5.png not found'); }
 
+let PS_PLAT_PS45_PNG = null;
+try {
+  PS_PLAT_PS45_PNG = fs.readFileSync(path.join(__dirname, 'assets/code-promo-ps45.png'));
+} catch (e) { console.warn('assets/code-promo-ps45.png not found'); }
+
 const CODE_FRAME_PNG = {};
 const CODE_FRAME_B64 = {};
 const CODE_PROMO_PNG = {};
@@ -386,7 +391,8 @@ app.get('/ps-plat-slide', (req, res) => {
   const key = (req.query.key || '').toLowerCase();
   const filename = req.query.filename ? decodeURIComponent(req.query.filename) + '.png' : `ps-plat-${key}.png`;
   let img = null;
-  if (key === 'ps5') img = PS_PLAT_PS5_PNG;
+  if (key === 'ps5')  img = PS_PLAT_PS5_PNG;
+  if (key === 'ps45') img = PS_PLAT_PS45_PNG;
   if (!img) return res.status(404).json({ error: `PS platform slide not found for key: ${key}` });
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

@@ -159,6 +159,7 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 }
 
 .pill-icon { font-size: 1rem; display: block; margin-bottom: 2px; }
+.pill-icon-svg { display: block; margin: 0 auto 3px; width: 32px; height: auto; }
 
 .ns-pill { color: #cc0000; border-color: rgba(224,0,0,0.25); }
 .ns-pill.sel { background: rgba(224,0,0,0.12); border-color: #e00000; color: #ff3333; }
@@ -441,8 +442,8 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <div class="form-group">
       <label>Platform</label>
       <div class="platform-grid">
-        <div class="plat-pill ns-pill" id="p-ns12"><span class="pill-icon">🔴</span>NS1 &amp; NS2</div>
-        <div class="plat-pill ns-pill" id="p-ns2"><span class="pill-icon">🔴</span>NS2 Only</div>
+        <div class="plat-pill ns-pill" id="p-ns12"><svg class="pill-icon-svg" viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="56" height="40" rx="20" fill="#e4000f"/><path d="M11 30V10h7.5l10 13.5V10h7V30h-7.5L18 16.5V30z" fill="white"/></svg>NS1 &amp; NS2</div>
+        <div class="plat-pill ns-pill" id="p-ns2"><svg class="pill-icon-svg" viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="56" height="40" rx="20" fill="#e4000f"/><path d="M11 30V10h7.5l10 13.5V10h7V30h-7.5L18 16.5V30z" fill="white"/></svg>NS2 Only</div>
         <div class="plat-pill ps-pill" id="p-ps45"><span class="pill-icon">🔵</span>PS4 &amp; PS5</div>
         <div class="plat-pill ps-pill" id="p-ps5"><span class="pill-icon">🔵</span>PS5 Only</div>
       </div>

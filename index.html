@@ -254,29 +254,6 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 
 .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn-store {
-  display: block;
-  width: 100%; padding: 11px; border-radius: 9px;
-  background: var(--surface2); border: 1px solid var(--accent); color: var(--accent);
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase;
-  cursor: pointer; text-align: center;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.btn-store:active { background: rgba(240,193,64,0.1); }
-
-.btn-canva {
-  display: block;
-  width: 100%; padding: 11px; border-radius: 9px;
-  background: var(--surface2); border: 1px solid #7c4dff; color: #a67cff;
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase;
-  cursor: pointer; text-align: center; margin-top: 8px;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.btn-canva:active { background: rgba(124,77,255,0.1); }
 
 /* ── Listings ── */
 .listings-header {
@@ -539,10 +516,6 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <div class="sync-row" id="syncRow">
       <div class="sync-dot"></div>
       <span id="syncMsg"></span>
-    </div>
-    <div style="padding: 0 14px 10px; display:none" id="storeBtnWrap">
-      <button class="btn-store" id="storeBtn">🖼 View Store Page for Screenshots</button>
-      <button class="btn-canva" id="canvaBtn">🎨 Open in Canva</button>
     </div>
     <div class="output-actions">
       <button class="btn-copy" id="copyBtn">⎘ Copy</button>
@@ -1015,49 +988,6 @@ function showOutput(txt) {
   el('thumbBtn').disabled = false;
   el('thumbBtn').textContent = '\ud83d\uddbc\ufe0f Generate Thumbnail';
   el('thumbCard').style.display = 'none';
-
-  // Store page button + Canva template button
-  var wrap = el('storeBtnWrap');
-  var su = el('storeUrl').value.trim();
-
-  var canvaLinks = {
-    ns12:    'DAGsTMK7LmQ',
-    ns2:     'DAGsTMK7LmQ',
-    ps45:    'DAG0MmfWtyI',
-    ps5:     'DAG0MmfWtyI',
-    code:    'DAG00T4ZR4Q'
-  };
-
-  var canvaKey = appMode === 'code' ? 'code' : platSel;
-  var canvaUrl = canvaLinks[canvaKey] || null;
-
-  // Show wrap if either button is relevant
-  if ((appMode === 'game' && su) || canvaUrl) {
-    wrap.style.display = 'block';
-  } else {
-    wrap.style.display = 'none';
-  }
-
-  // Store button
-  var storeBtn = el('storeBtn');
-  if (appMode === 'game' && su) {
-    storeBtn.style.display = 'block';
-    var fullUrl = su.startsWith('http') ? su : 'https://' + su;
-    storeBtn.onclick = function() { window.open(fullUrl, '_blank'); };
-  } else {
-    storeBtn.style.display = 'none';
-  }
-
-  // Canva button — deep link opens app, fallback to web
-  var canvaBtn = el('canvaBtn');
-  if (canvaUrl) {
-    canvaBtn.style.display = 'block';
-    canvaBtn.onclick = function() {
-      window.open('https://www.canva.com/design/' + canvaUrl + '/edit', '_blank');
-    };
-  } else {
-    canvaBtn.style.display = 'none';
-  }
 
   setTimeout(function() {
     el('outputCard').scrollIntoView({ behavior: 'smooth', block: 'start' });

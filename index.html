@@ -174,10 +174,9 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 
 /* ── Subtype Cards (Code) ── */
 .subtype-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-.sub-card { padding: 13px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; text-align: center; transition: background 0.12s, border-color 0.12s; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-.sub-card-icon { display: flex; justify-content: center; margin-bottom: 7px; }
-.sub-card-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 3px; }
-.sub-card-desc { font-size: 0.6rem; color: var(--muted); opacity: 0.65; font-family: 'DM Mono', monospace; display: block; }
+.sub-card { padding: 9px 6px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; text-align: center; transition: background 0.12s, border-color 0.12s; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.sub-card-icon { display: flex; justify-content: center; margin-bottom: 5px; }
+.sub-card-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); display: block; }
 .sub-card.on { background: rgba(62,207,126,0.07); border-color: var(--green); }
 .sub-card.on .sub-card-name { color: var(--green); }
 
@@ -467,7 +466,6 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
             </svg>
           </span>
           <span class="sub-card-name">Full Game</span>
-          <span class="sub-card-desc">Complete title</span>
         </div>
         <div class="sub-card" id="sub-dlc">
           <span class="sub-card-icon">
@@ -476,7 +474,6 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
             </svg>
           </span>
           <span class="sub-card-name">DLC</span>
-          <span class="sub-card-desc">Add-on content</span>
         </div>
         <div class="sub-card" id="sub-upgrade">
           <span class="sub-card-icon">
@@ -486,7 +483,6 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
             </svg>
           </span>
           <span class="sub-card-name">Upgrade</span>
-          <span class="sub-card-desc">Edition upgrade</span>
         </div>
       </div>
     </div>

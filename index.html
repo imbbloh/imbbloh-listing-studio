@@ -171,20 +171,14 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
   font-family: 'DM Mono', monospace; margin-bottom: 8px; display: none;
 }
 
-/* ── Subtype Pills (Code) ── */
-.subtype-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-
-.sub-pill {
-  padding: 9px 4px; border-radius: 9px;
-  border: 1px solid var(--border); background: var(--surface2);
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase;
-  cursor: pointer; text-align: center; color: var(--muted);
-  user-select: none; -webkit-user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.sub-pill.sub-active { background: var(--green); color: #0d0d10; border-color: var(--green); }
+/* ── Subtype Cards (Code) ── */
+.subtype-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.sub-card { padding: 13px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; text-align: center; transition: background 0.12s, border-color 0.12s; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.sub-card-icon { display: flex; justify-content: center; margin-bottom: 7px; }
+.sub-card-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 3px; }
+.sub-card-desc { font-size: 0.6rem; color: var(--muted); opacity: 0.65; font-family: 'DM Mono', monospace; display: block; }
+.sub-card.on { background: rgba(62,207,126,0.07); border-color: var(--green); }
+.sub-card.on .sub-card-name { color: var(--green); }
 
 /* ── Generate Button ── */
 .btn-gen {
@@ -463,10 +457,38 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <!-- Code Subtype (code mode only) -->
     <div class="form-group" id="secSubtype" style="display:none">
       <label>Code Type</label>
-      <div class="subtype-grid">
-        <div class="sub-pill sub-active" id="sub-full">🎮 Full Game</div>
-        <div class="sub-pill" id="sub-dlc">🔹 DLC</div>
-        <div class="sub-pill" id="sub-upgrade">⬆️ Upgrade Pack</div>
+      <div class="subtype-cards">
+        <div class="sub-card on" id="sub-full">
+          <span class="sub-card-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 2h10a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#3ecf7e" fill-opacity="0.18" stroke="#3ecf7e" stroke-width="1.5"/>
+              <line x1="9" y1="16" x2="9" y2="19" stroke="#3ecf7e" stroke-width="1.4" stroke-linecap="round"/>
+              <line x1="12" y1="16" x2="12" y2="19" stroke="#3ecf7e" stroke-width="1.4" stroke-linecap="round"/>
+              <line x1="15" y1="16" x2="15" y2="19" stroke="#3ecf7e" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="sub-card-name">Full Game</span>
+          <span class="sub-card-desc">Complete title</span>
+        </div>
+        <div class="sub-card" id="sub-dlc">
+          <span class="sub-card-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M19 11V7.5A1.5 1.5 0 0 0 17.5 6H14a2 2 0 1 0-4 0H6.5A1.5 1.5 0 0 0 5 7.5V11a2 2 0 1 0 0 4v1.5A1.5 1.5 0 0 0 6.5 18h11A1.5 1.5 0 0 0 19 16.5V15a2 2 0 1 0 0-4z" fill="#3ecf7e" fill-opacity="0.18" stroke="#3ecf7e" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="sub-card-name">DLC</span>
+          <span class="sub-card-desc">Add-on content</span>
+        </div>
+        <div class="sub-card" id="sub-upgrade">
+          <span class="sub-card-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polyline points="5,14.5 12,7.5 19,14.5" stroke="#3ecf7e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="5,19.5 12,12.5 19,19.5" stroke="#3ecf7e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="sub-card-name">Upgrade</span>
+          <span class="sub-card-desc">Edition upgrade</span>
+        </div>
       </div>
     </div>
 
@@ -667,9 +689,9 @@ function setSub(s) {
   codeSub = s;
 
   ['full', 'dlc', 'upgrade'].forEach(function(id) {
-    el('sub-' + id).classList.remove('sub-active');
+    el('sub-' + id).classList.remove('on');
   });
-  el('sub-' + s).classList.add('sub-active');
+  el('sub-' + s).classList.add('on');
 
   // Upgrade Pack = NS2 only — dim NS1&2 and PS pills
   var ns12 = el('p-ns12');

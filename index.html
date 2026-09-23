@@ -159,7 +159,7 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 }
 
 .pill-icon { font-size: 1rem; display: block; margin-bottom: 2px; }
-.pill-icon-svg { display: block; margin: 0 auto 3px; width: 32px; height: auto; }
+.pill-icon-svg { display: block; margin: 0 auto 3px; width: 32px; height: 32px; }
 
 .ns-pill { color: #cc0000; border-color: rgba(224,0,0,0.25); }
 .ns-pill.sel { background: rgba(224,0,0,0.12); border-color: #e00000; color: #ff3333; }
@@ -190,15 +190,24 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 
 /* ── Generate Button ── */
 .btn-gen {
-  width: 100%; padding: 14px; border-radius: 10px;
+  width: 100%; padding: 18px 14px; border-radius: 10px;
   background: var(--accent); color: #0d0d10;
   font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase;
-  border: none; cursor: pointer; margin-top: 4px;
+  font-size: 0.9rem; letter-spacing: 0.12em; text-transform: uppercase;
+  border: none; cursor: pointer; margin-top: 6px;
   -webkit-tap-highlight-color: transparent;
 }
 
 .btn-gen.code-mode { background: var(--green); }
+
+.url-toggle {
+  width: 100%; background: transparent; border: 1px dashed var(--border);
+  border-radius: 9px; padding: 9px 14px; color: var(--muted);
+  font-family: 'DM Mono', monospace; font-size: 0.7rem; cursor: pointer;
+  text-align: left; display: flex; align-items: center; justify-content: space-between;
+  transition: border-color 0.12s; -webkit-tap-highlight-color: transparent;
+}
+.url-toggle:hover { border-color: var(--muted); }
 
 /* ── Output ── */
 .output-card {
@@ -442,10 +451,10 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
     <div class="form-group">
       <label>Platform</label>
       <div class="platform-grid">
-        <div class="plat-pill ns-pill" id="p-ns12"><svg class="pill-icon-svg" viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="56" height="40" rx="20" fill="#e4000f"/><path d="M11 30V10h7.5l10 13.5V10h7V30h-7.5L18 16.5V30z" fill="white"/></svg>NS1 &amp; NS2</div>
-        <div class="plat-pill ns-pill" id="p-ns2"><svg class="pill-icon-svg" viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="56" height="40" rx="20" fill="#e4000f"/><path d="M11 30V10h7.5l10 13.5V10h7V30h-7.5L18 16.5V30z" fill="white"/></svg>NS2 Only</div>
-        <div class="plat-pill ps-pill" id="p-ps45"><span class="pill-icon">🔵</span>PS4 &amp; PS5</div>
-        <div class="plat-pill ps-pill" id="p-ps5"><span class="pill-icon">🔵</span>PS5 Only</div>
+        <div class="plat-pill ns-pill" id="p-ns12"><svg class="pill-icon-svg" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" fill="#E60012"><path fill-rule="evenodd" d="M196 32H144C82.1 32 32 82.1 32 144v224c0 61.9 50.1 112 112 112h52c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16zm-52 48h20v352h-20c-35.3 0-64-28.7-64-64V144c0-35.3 28.7-64 64-64z"/><circle cx="128" cy="152" r="30"/><path fill-rule="evenodd" d="M368 32h-52c-8.8 0-16 7.2-16 16v416c0 8.8 7.2 16 16 16h52c61.9 0 112-50.1 112-112V144c0-61.9-50.1-112-112-112zm16 328c-16.6 0-30-13.4-30-30s13.4-30 30-30 30 13.4 30 30-13.4 30-30 30z"/></svg>NS1 &amp; NS2</div>
+        <div class="plat-pill ns-pill" id="p-ns2"><svg class="pill-icon-svg" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" fill="#E60012"><path fill-rule="evenodd" d="M196 32H144C82.1 32 32 82.1 32 144v224c0 61.9 50.1 112 112 112h52c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16zm-52 48h20v352h-20c-35.3 0-64-28.7-64-64V144c0-35.3 28.7-64 64-64z"/><circle cx="128" cy="152" r="30"/><path fill-rule="evenodd" d="M368 32h-52c-8.8 0-16 7.2-16 16v416c0 8.8 7.2 16 16 16h52c61.9 0 112-50.1 112-112V144c0-61.9-50.1-112-112-112zm16 328c-16.6 0-30-13.4-30-30s13.4-30 30-30 30 13.4 30 30-13.4 30-30 30z"/></svg>NS2 Only</div>
+        <div class="plat-pill ps-pill" id="p-ps45"><svg class="pill-icon-svg" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><defs><mask id="ps-p1"><rect width="512" height="512" fill="#fff"/><rect x="283" y="112" width="20" height="356" rx="10" fill="#000"/></mask></defs><g fill="#0070D1" mask="url(#ps-p1)"><path d="M190 57h140c72 0 98 45 98 117 0 72-46 118-120 118h-23v170h-95z"/><path fill="none" stroke="#0070D1" stroke-width="46" stroke-linecap="round" d="M155 393 C75 388 20 360 20 328 C20 296 98 278 190 272 C282 266 412 276 468 298 C518 320 516 360 478 390 C440 420 344 448 263 456"/></g></svg>PS4 &amp; PS5</div>
+        <div class="plat-pill ps-pill" id="p-ps5"><svg class="pill-icon-svg" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><defs><mask id="ps-p2"><rect width="512" height="512" fill="#fff"/><rect x="283" y="112" width="20" height="356" rx="10" fill="#000"/></mask></defs><g fill="#0070D1" mask="url(#ps-p2)"><path d="M190 57h140c72 0 98 45 98 117 0 72-46 118-120 118h-23v170h-95z"/><path fill="none" stroke="#0070D1" stroke-width="46" stroke-linecap="round" d="M155 393 C75 388 20 360 20 328 C20 296 98 278 190 272 C282 266 412 276 468 298 C518 320 516 360 478 390 C440 420 344 448 263 456"/></g></svg>PS5 Only</div>
       </div>
     </div>
 
@@ -492,11 +501,16 @@ input::placeholder { color: var(--muted); opacity: 0.5; }
 
     <!-- Store URL (game mode only) -->
     <div class="form-group" id="secStoreUrl">
-      <label>Official Store URL <span style="color:var(--green);font-size:0.65rem;font-weight:600">● Auto-generated</span></label>
-      <input type="text" id="storeUrl" placeholder="Auto-generated from title">
+      <button class="url-toggle" onclick="toggleStoreUrl(this)" id="storeUrlToggle" type="button">
+        <span>+ Store URL</span>
+        <span style="color:var(--green);font-family:'DM Mono',monospace;font-size:0.65rem">auto-generated</span>
+      </button>
+      <div id="storeUrlReveal" hidden style="margin-top:8px">
+        <input type="text" id="storeUrl" placeholder="Auto-generated from title">
+      </div>
     </div>
 
-    <button class="btn-gen" id="genBtn">✦ Generate Listing</button>
+    <button class="btn-gen" id="genBtn">GENERATE</button>
   </div>
 
   <!-- Output -->
@@ -593,6 +607,13 @@ var saved     = JSON.parse(localStorage.getItem('ibl') || '[]');
 // ── DOM refs ───────────────────────────────────────────────────────────────
 function el(id) { return document.getElementById(id); }
 
+// ── Store URL toggle ───────────────────────────────────────────────────────
+function toggleStoreUrl(btn) {
+  var rev = el('storeUrlReveal');
+  rev.hidden = !rev.hidden;
+  btn.querySelector('span').textContent = rev.hidden ? '+ Store URL' : '− Store URL';
+}
+
 // ── Store URL visibility helper ────────────────────────────────────────────
 function updateCodeStoreUrlViz() {
   // Store URL hidden in code mode (auto-resolved for both NS and PS)
@@ -633,6 +654,10 @@ function setMode(m) {
   el('outputCard').classList.remove('visible');
   el('storeUrl').value = '';
   el('storeUrl').style.color = '';
+  // Reset store URL toggle to closed state
+  var rev = el('storeUrlReveal'), tog = el('storeUrlToggle');
+  if (rev) rev.hidden = true;
+  if (tog) tog.querySelector('span').textContent = '+ Store URL';
 }
 
 // ── Code subtype ───────────────────────────────────────────────────────────

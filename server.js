@@ -173,6 +173,7 @@ function extractNintendoAssets(html) {
   // The current product's atum entry is uniquely followed by "publisherNotifications"
   // (related-game entries are followed by "qtyAllowedPerCustomer" / "releaseDate").
   let atumCoverUrl = null;
+  let packshotUrl  = null; // NS2: explicit packshot URL found in page
 
   const nextScriptMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (nextScriptMatch) {
@@ -181,6 +182,29 @@ function extractNintendoAssets(html) {
     const mainM = mainProdRe.exec(nextScriptMatch[1]);
     if (mainM) {
       atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${mainM[1]}`;
+    }
+
+    // NS2: search __NEXT_DATA__ for a packshot/box-art image URL
+    if (!atumCoverUrl) {
+      try {
+        const nd = JSON.parse(nextScriptMatch[1]);
+        const findPackshot = (obj, depth) => {
+          if (!obj || depth > 9 || typeof obj !== 'object') return null;
+          if (typeof obj.url === 'string' && obj.url.includes('assets.nintendo.com')) {
+            const t = (obj.type || obj.role || '').toLowerCase();
+            if (t.includes('packshot') || t.includes('boxart') || t === 'primary') return obj.url;
+          }
+          for (const v of Object.values(obj)) {
+            const r = Array.isArray(v)
+              ? v.reduce((a, x) => a || findPackshot(x, depth + 1), null)
+              : findPackshot(v, depth + 1);
+            if (r) return r;
+          }
+          return null;
+        };
+        const ps = findPackshot(nd?.props?.pageProps, 0);
+        if (ps) packshotUrl = ps;
+      } catch (e) {}
     }
   }
 
@@ -193,9 +217,19 @@ function extractNintendoAssets(html) {
     }
   }
 
-  console.log('[NS] platform:', platform, 'nsuid:', nsuid, 'hashes:', hashes, 'squareHash:', squareHash, 'atumCoverUrl:', atumCoverUrl);
+  // NS2 fallback: look for explicit ar_1:1 CDN URLs in the HTML for this game
+  // (Nintendo sometimes pre-generates square packshot URLs in the page)
+  if (!atumCoverUrl && !packshotUrl) {
+    const ar1Re = new RegExp(
+      `https://assets\\.nintendo\\.com/image/upload/[a-zA-Z0-9_:.,/-]*ar_1:1[a-zA-Z0-9_:.,/-]*/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,}`
+    );
+    const ar1M = html.match(ar1Re);
+    if (ar1M) packshotUrl = ar1M[0];
+  }
 
-  return { platform, nsuid, hashes, squareHash, atumCoverUrl };
+  console.log('[NS] platform:', platform, 'nsuid:', nsuid, 'hashes:', hashes, 'squareHash:', squareHash, 'atumCoverUrl:', atumCoverUrl, 'packshotUrl:', packshotUrl);
+
+  return { platform, nsuid, hashes, squareHash, atumCoverUrl: atumCoverUrl || packshotUrl };
 }
 
 function extractPsAssets(html) {

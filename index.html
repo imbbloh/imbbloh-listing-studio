@@ -1307,8 +1307,8 @@ async function renderCodeThumb(coverBlobUrl, frameBlobUrl, codeSub) {
   var areaX = area[0], areaY = area[1], areaW = area[2], areaH = area[3];
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(areaX, areaY, areaW, areaH);
-  if (codeSub === 'full') {
-    // Contain square box art: top-align, white fills any side gaps.
+  if (codeSub === 'full' && coverImg.width <= coverImg.height * 1.1) {
+    // Square/portrait box art: contain, centered horizontally, top-aligned.
     var scale = Math.min(areaW / coverImg.width, areaH / coverImg.height);
     var w = coverImg.width * scale;
     var h = coverImg.height * scale;

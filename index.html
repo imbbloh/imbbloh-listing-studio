@@ -658,6 +658,7 @@ function setSub(s) {
 
   ['full', 'dlc', 'upgrade'].forEach(function(id) {
     el('sub-' + id).classList.remove('on');
+    el('sub-' + id).classList.remove('sub-active');
   });
   el('sub-' + s).classList.add('on');
 

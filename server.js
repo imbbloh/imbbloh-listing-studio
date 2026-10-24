@@ -195,19 +195,37 @@ function extractNintendoAssets(html) {
       if (ns2M) packshotUrl = ns2M[1];
     }
 
-    // NS2 fallback: if anchor missed (normalized Apollo cache puts BasicImage in a separate
-    // cache entry, so the URL is never adjacent to publisherNotifications), scan __NEXT_DATA__
-    // for all Cloudinary URLs for this nsuid and pick one without landscape/crop transforms.
+    // NS2 fallback: normalized Apollo cache stores images in separate BasicImage cache entries
+    // with keys like "BasicImage:HASH". "coverImage" field on the SoftwareTitle entry holds a
+    // __ref pointing to the packshot; "heroImage"/"bannerImage" points to the landscape art.
+    // Step 1: find a "coverImage" ref whose resolved URL belongs to this nsuid.
+    // Step 2: if __ref style, look up the referenced entry's URL.
     if (!atumCoverUrl && !packshotUrl) {
-      const ns2AllRe = new RegExp(
-        `"url":"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"`,
+      const nextData = nextScriptMatch[1];
+
+      // Case A: coverImage is inline { "coverImage": { "url": "...", ... } }
+      const inlineRe = new RegExp(
+        `"coverImage":\\{[^}]*"url":"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"`,
         'g'
       );
-      const ns2Urls = [...nextScriptMatch[1].matchAll(ns2AllRe)].map(m => m[1]);
-      // Skip URLs with landscape AR transforms or forced crop — those are banners/screenshots
-      const portrait = ns2Urls.find(u => !u.includes('ar_16:9') && !u.includes('ar_2:1') && !u.includes('c_fill'));
-      if (portrait) packshotUrl = portrait;
-      // Don't fall back to first URL blindly — a landscape URL would be worse than ar_1:1,c_fill crop
+      const inlineM = inlineRe.exec(nextData);
+      if (inlineM) {
+        packshotUrl = inlineM[1];
+      } else {
+        // Case B: normalized cache — "coverImage": { "__ref": "BasicImage:XXX" }
+        // Walk all coverImage refs; for each, look up the referenced entry's URL and
+        // confirm it belongs to this nsuid (filters out related-game coverImages).
+        const coverRefRe = /"coverImage":\{"__ref":"([^"]+)"\}/g;
+        let cRefM;
+        while ((cRefM = coverRefRe.exec(nextData)) !== null) {
+          const refKey = cRefM[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const urlRe = new RegExp(
+            `"${refKey}":\\{[^}]*"url":"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"[^}]*\\}`
+          );
+          const urlM = urlRe.exec(nextData);
+          if (urlM) { packshotUrl = urlM[1]; break; }
+        }
+      }
     }
   }
 
@@ -659,15 +677,27 @@ app.get('/debug-ns', async (req, res) => {
 
     // NS2: all Cloudinary URLs for this nsuid in __NEXT_DATA__
     let ns2UrlsInNextData = null;
+    let ns2CoverImageRefs = null;
     if (ndMatch) {
       const ns2Re = new RegExp(
         `"url":"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"`,
         'g'
       );
       ns2UrlsInNextData = [...ndMatch[1].matchAll(ns2Re)].map(m => m[1]);
+
+      // Show all coverImage __ref values with their resolved URLs
+      const coverRefRe2 = /"coverImage":\{"__ref":"([^"]+)"\}/g;
+      ns2CoverImageRefs = [];
+      let crM;
+      while ((crM = coverRefRe2.exec(ndMatch[1])) !== null) {
+        const refKey = crM[1];
+        const escaped = refKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const urlM2 = new RegExp(`"${escaped}":\\{[^}]*"url":"([^"]+)"`).exec(ndMatch[1]);
+        ns2CoverImageRefs.push({ ref: refKey, url: urlM2 ? urlM2[1] : null });
+      }
     }
 
-    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, ogImage, atumAll, atumInNextData, ns2UrlsInNextData, contexts });
+    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, ogImage, atumAll, atumInNextData, ns2UrlsInNextData, ns2CoverImageRefs, contexts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

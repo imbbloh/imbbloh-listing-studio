@@ -189,7 +189,7 @@ function extractNintendoAssets(html) {
     // "[^}]*}," allows trailing fields in the coverImage object (e.g. __typename).
     if (!atumCoverUrl) {
       const ns2ProdRe = new RegExp(
-        `"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"[^}]*},"(?:publisherNotifications|relatedArticles|downloadableContent)"`
+        `"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"[^}]*},"(?:publisherNotifications|relatedArticles|downloadableContent)`
       );
       const ns2M = ns2ProdRe.exec(nextScriptMatch[1]);
       if (ns2M) packshotUrl = ns2M[1];
@@ -340,11 +340,16 @@ function buildCodeThumbnailSvg(gameTitle, frameBase64, fontBase64) {
 function buildCdnUrls(platform, nsuid, hashes, squareHash, atumCoverUrl) {
   const base       = 'https://assets.nintendo.com/image/upload';
   const mainPath   = `store/software/${platform}/${nsuid}/${hashes[0]}`;
-  // squareHash (edition-selector thumbnail, correct packshot) takes first priority.
-  // atumCoverUrl is used only when squareHash is absent (NS1 atum, or NS2 coverImage ref).
-  const squareCoverUrl = squareHash
-    ? `${base}/q_auto/f_auto/store/software/${platform}/${nsuid}/${squareHash}`
-    : atumCoverUrl || `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
+  // NS2 anchor detection sets atumCoverUrl to a direct CDN upload URL (image/upload/).
+  // Prefer it over squareHash: Nintendo's __NEXT_DATA__ now includes the landscape banner
+  // as a q_auto/f_auto URL, which makes squareHash pick the wrong hash when it appears first.
+  // NS1 atum detection sets atumCoverUrl to an image/fetch/ URL — fall through to squareHash.
+  const isCdnUploadUrl = atumCoverUrl && atumCoverUrl.startsWith('https://assets.nintendo.com/image/upload/');
+  const squareCoverUrl = isCdnUploadUrl
+    ? atumCoverUrl
+    : squareHash
+      ? `${base}/q_auto/f_auto/store/software/${platform}/${nsuid}/${squareHash}`
+      : atumCoverUrl || `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
   return {
     upload:          `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
     coverUrl:        `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,

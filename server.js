@@ -177,19 +177,19 @@ function extractNintendoAssets(html) {
 
   const nextScriptMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (nextScriptMatch) {
-    // Match the atum hash whose Apollo cache entry contains main-product-only fields
-    const mainProdRe = /atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)"},"(?:publisherNotifications|relatedArticles|downloadableContent)/;
+    // Match the atum hash whose Apollo cache entry contains main-product-only fields.
+    // "[^}]*}," allows for trailing fields (e.g. __typename) after the URL in the same object.
+    const mainProdRe = /atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)"[^}]*},"(?:publisherNotifications|relatedArticles|downloadableContent)/;
     const mainM = mainProdRe.exec(nextScriptMatch[1]);
     if (mainM) {
       atumCoverUrl = `https://assets.nintendo.com/image/fetch/q_auto/f_auto/https://atum-img-lp1.cdn.nintendo.net/i/c/${mainM[1]}`;
     }
 
-    // NS2: same anchor approach — CDN URL for THIS nsuid followed by publisherNotifications
-    // (same logic as atum above: the main product's image entry is uniquely followed by
-    //  publisherNotifications/relatedArticles, skipping all related-game entries before it)
+    // NS2: same anchor approach — CDN URL for THIS nsuid followed by publisherNotifications.
+    // "[^}]*}," allows trailing fields in the coverImage object (e.g. __typename).
     if (!atumCoverUrl) {
       const ns2ProdRe = new RegExp(
-        `(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"},"(?:publisherNotifications|relatedArticles|downloadableContent)`
+        `"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"[^}]*},"(?:publisherNotifications|relatedArticles|downloadableContent)"`
       );
       const ns2M = ns2ProdRe.exec(nextScriptMatch[1]);
       if (ns2M) packshotUrl = ns2M[1];

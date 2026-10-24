@@ -194,6 +194,21 @@ function extractNintendoAssets(html) {
       const ns2M = ns2ProdRe.exec(nextScriptMatch[1]);
       if (ns2M) packshotUrl = ns2M[1];
     }
+
+    // NS2 fallback: if anchor missed (normalized Apollo cache puts BasicImage in a separate
+    // cache entry, so the URL is never adjacent to publisherNotifications), scan __NEXT_DATA__
+    // for all Cloudinary URLs for this nsuid and pick one without landscape/crop transforms.
+    if (!atumCoverUrl && !packshotUrl) {
+      const ns2AllRe = new RegExp(
+        `"url":"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"`,
+        'g'
+      );
+      const ns2Urls = [...nextScriptMatch[1].matchAll(ns2AllRe)].map(m => m[1]);
+      // Skip URLs with landscape AR transforms or forced crop — those are banners/screenshots
+      const portrait = ns2Urls.find(u => !u.includes('ar_16:9') && !u.includes('ar_2:1') && !u.includes('c_fill'));
+      if (portrait) packshotUrl = portrait;
+      else if (ns2Urls.length) packshotUrl = ns2Urls[0];
+    }
   }
 
   // Fallback: atum URL outside the UBTQd recommendation carousel in the HTML body
@@ -642,7 +657,17 @@ app.get('/debug-ns', async (req, res) => {
       ? (ndMatch[1].match(/atum-img-lp1\.cdn\.nintendo\.net\/i\/c\/([a-f0-9]{32}_\d+)/g) || []).slice(0, 5)
       : null;
 
-    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, ogImage, atumAll, atumInNextData, contexts });
+    // NS2: all Cloudinary URLs for this nsuid in __NEXT_DATA__
+    let ns2UrlsInNextData = null;
+    if (ndMatch) {
+      const ns2Re = new RegExp(
+        `"url":"(https://assets\\.nintendo\\.com/image/upload/[^"]+/store/software/${platform}/${nsuid}/[a-zA-Z0-9_-]{20,})"`,
+        'g'
+      );
+      ns2UrlsInNextData = [...ndMatch[1].matchAll(ns2Re)].map(m => m[1]);
+    }
+
+    res.json({ platform, nsuid, hashes, squareHash, atumCoverUrl, ogImage, atumAll, atumInNextData, ns2UrlsInNextData, contexts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

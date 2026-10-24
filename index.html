@@ -1506,7 +1506,9 @@ el('thumbBtn').addEventListener('click', async function() {
         el('thumbLinks').textContent =
           'Thumbnail (File 1): [generated — use downloaded file]' +
           '\n\nPromo (File 2):\n' + THUMB_WORKER + '/code-promo-slide?key=eshop' +
-          '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/code-promo-slide?key=' + cPlatKey;
+          '\n\nPlatform (File 3):\n' + THUMB_WORKER + '/code-promo-slide?key=' + cPlatKey +
+          '\n\nCover URL used:\n' + cEffectiveCoverUrl +
+          '\n\nDebug (NS hashes):\n' + THUMB_WORKER + '/debug-ns?url=' + encodeURIComponent(cStoreUrl);
       }
 
       el('thumbCard').style.display = 'block';

@@ -207,7 +207,7 @@ function extractNintendoAssets(html) {
       // Skip URLs with landscape AR transforms or forced crop — those are banners/screenshots
       const portrait = ns2Urls.find(u => !u.includes('ar_16:9') && !u.includes('ar_2:1') && !u.includes('c_fill'));
       if (portrait) packshotUrl = portrait;
-      else if (ns2Urls.length) packshotUrl = ns2Urls[0];
+      // Don't fall back to first URL blindly — a landscape URL would be worse than ar_1:1,c_fill crop
     }
   }
 

@@ -307,9 +307,12 @@ function buildCodeThumbnailSvg(gameTitle, frameBase64, fontBase64) {
 function buildCdnUrls(platform, nsuid, hashes, squareHash, atumCoverUrl) {
   const base       = 'https://assets.nintendo.com/image/upload';
   const mainPath   = `store/software/${platform}/${nsuid}/${hashes[0]}`;
-  const squareCoverUrl = squareHash
-    ? `${base}/q_auto/f_auto/store/software/${platform}/${nsuid}/${squareHash}`
-    : atumCoverUrl || `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
+  // NS2 anchor packshot (full /image/upload/ URL) takes priority over squareHash
+  const squareCoverUrl = (atumCoverUrl && atumCoverUrl.includes('/image/upload/'))
+    ? atumCoverUrl
+    : squareHash
+      ? `${base}/q_auto/f_auto/store/software/${platform}/${nsuid}/${squareHash}`
+      : atumCoverUrl || `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
   return {
     upload:          `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
     coverUrl:        `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,

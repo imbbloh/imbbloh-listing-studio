@@ -340,16 +340,19 @@ function buildCodeThumbnailSvg(gameTitle, frameBase64, fontBase64) {
 function buildCdnUrls(platform, nsuid, hashes, squareHash, atumCoverUrl) {
   const base       = 'https://assets.nintendo.com/image/upload';
   const mainPath   = `store/software/${platform}/${nsuid}/${hashes[0]}`;
-  // NS2 anchor detection sets atumCoverUrl to a direct CDN upload URL (image/upload/).
-  // Prefer it over squareHash: Nintendo's __NEXT_DATA__ now includes the landscape banner
-  // as a q_auto/f_auto URL, which makes squareHash pick the wrong hash when it appears first.
-  // NS1 atum detection sets atumCoverUrl to an image/fetch/ URL — fall through to squareHash.
+  // squareCoverUrl always applies ar_1:1,c_fill to guarantee a 1:1 square image for the
+  // code thumbnail white box, regardless of the original image aspect ratio.
+  // NS2: atumCoverUrl is the anchor-detected packshot (CDN upload URL) — insert crop.
+  // NS1: atumCoverUrl is the atum fetch URL (main box art) — insert crop.
+  // squareHash used only when atumCoverUrl is absent; fallback crops the main hash.
   const isCdnUploadUrl = atumCoverUrl && atumCoverUrl.startsWith('https://assets.nintendo.com/image/upload/');
   const squareCoverUrl = isCdnUploadUrl
-    ? atumCoverUrl
-    : squareHash
-      ? `${base}/q_auto/f_auto/store/software/${platform}/${nsuid}/${squareHash}`
-      : atumCoverUrl || `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
+    ? atumCoverUrl.replace('/image/upload/', '/image/upload/ar_1:1,c_fill/')
+    : atumCoverUrl
+      ? atumCoverUrl.replace('/image/fetch/', '/image/fetch/ar_1:1,c_fill/')
+      : squareHash
+        ? `${base}/ar_1:1,c_fill/q_auto/f_auto/store/software/${platform}/${nsuid}/${squareHash}`
+        : `${base}/ar_1:1,c_fill/f_auto/q_auto/${mainPath}`;
   return {
     upload:          `${base}/ar_16:9,c_lpad,w_1240/b_white/f_jpg/q_auto/${mainPath}`,
     coverUrl:        `${base}/ar_16:9,c_lpad,w_1240/b_white/f_auto/q_auto/${mainPath}`,
